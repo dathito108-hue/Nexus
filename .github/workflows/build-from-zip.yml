@@ -82,9 +82,9 @@ jobs:
           from pathlib import Path
           p = Path("app/src/main/res/layout/activity_main.xml")
           s = p.read_text(encoding="utf-8")
-          tail = "</LinearLayout>\\n</androidx.core.widget.NestedScrollView>"
-          if s.endswith(tail):
-              s = s[:-len(tail)] + "</LinearLayout>\\n    </LinearLayout>\\n</androidx.core.widget.NestedScrollView>"
+          marker = "</androidx.core.widget.NestedScrollView>"
+          if s.count("<LinearLayout") > s.count("</LinearLayout>"):
+              s = s.replace(marker, "    </LinearLayout>\\n" + marker, 1)
               p.write_text(s, encoding="utf-8")
 
       - name: Enable AndroidX
