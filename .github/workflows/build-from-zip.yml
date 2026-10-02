@@ -88,6 +88,59 @@ jobs:
               s = s.replace(marker, ("</LinearLayout>" * missing) + marker, 1)
               p.write_text(s, encoding="utf-8")
 
+      - name: Patch Kotlin source compatibility
+        shell: python
+        run: |
+          from pathlib import Path
+
+          def edit(rel, fn):
+              p = Path(rel)
+              s = p.read_text(encoding="utf-8")
+              s2 = fn(s)
+              if s2 == s:
+                  raise SystemExit(f"No patch applied: {rel}")
+              p.write_text(s2, encoding="utf-8")
+
+          edit("app/src/main/java/com/hypernexus/nit/MainActivity.kt",
+               lambda s: s.replace("(${mesh.triangleCount} tam giác)", "(${file.length()} bytes)"))
+
+          edit("app/src/main/java/com/hypernexus/nit/accessibility/NitAccessibilityService.kt",
+               lambda s: s.replace("package com.hypernexus.nit.accessibility\n",
+                                    "package com.hypernexus.nit.accessibility\n\nimport kotlinx.coroutines.launch\n", 1))
+
+          edit("app/src/main/java/com/hypernexus/nit/engine/Procedural3DGenerator.kt",
+               lambda s: s.replace("min(i1, i2) to max(i1, i2)", "minOf(i1, i2) to maxOf(i1, i2)")
+                           .replace("min(i2, i3) to max(i2, i3)", "minOf(i2, i3) to maxOf(i2, i3)")
+                           .replace("min(i3, i1) to max(i3, i1)", "minOf(i3, i1) to maxOf(i3, i1)"))
+
+          edit("app/src/main/java/com/hypernexus/nit/finance/InstitutionalMarketAnalyzer.kt",
+               lambda s: s.replace("latestHigh", "lastHigh").replace("latestLow", "lastLow"))
+
+          edit("app/src/main/java/com/hypernexus/nit/finance/SolanaDexDataManager.kt",
+               lambda s: s.replace("            if (bestPair == null) {\n                bestPair = pairsArray.getJSONObject(0)\n            }\n\n",
+                                   "            if (bestPair == null) {\n                bestPair = pairsArray.getJSONObject(0)\n            }\n            val selectedPair = bestPair!!\n\n")
+                           .replace("bestPair.optString", "selectedPair.optString")
+                           .replace("bestPair.getJSONObject", "selectedPair.getJSONObject")
+                           .replace("bestPair.optDouble", "selectedPair.optDouble")
+                           .replace("bestPair.optJSONObject", "selectedPair.optJSONObject"))
+
+          edit("app/src/main/java/com/hypernexus/nit/planner/AutonomousHealer.kt",
+               lambda s: s.replace("private fun heal3DAction(", "private suspend fun heal3DAction(")
+                           .replace("val storyboard = DynamicCapCutSynthesisEngine.parseDirectorStoryboard(customPrompt)",
+                                    "val storyboard = DynamicCapCutSynthesisEngine.parseCapCutSpecFromPrompt(customPrompt)")
+                           .replace("${storyboard.themeTitle}", "${storyboard.projectTitle}")
+                           .replace("${storyboard.aspectRatio}", "${storyboard.targetAspectRatio}")
+                           .replace("${storyboard.cutPacingSeconds}", "${storyboard.cutPacingIntervalSeconds}")
+                           .replace("${storyboard.colorGradeLut}", "${storyboard.colorFilterName}")
+                           .replace("${storyboard.musicVibe}", "${storyboard.bgmGenre}")
+                           .replace("${storyboard.audioDuckingLevelPct}", "${storyboard.bgmVolumePercent}")
+                           .replace("${storyboard.visualEffect}", "${storyboard.visualEffectName}"))
+
+          edit("app/src/main/java/com/hypernexus/nit/video/DynamicCapCutSynthesisEngine.kt",
+               lambda s: s.replace("MicroRobotOverlayService.RobotState.IDLE", "MicroRobotOverlayService.RobotState.SLEEP")
+                           .replace("val clicked = service.clickNodeByText(textOptions)",
+                                    "val clicked = textOptions.any { service.clickNodeByText(it) }"))
+
       - name: Enable AndroidX
         run: |
           printf "android.useAndroidX=true\nandroid.enableJetifier=true\n" >> gradle.properties
