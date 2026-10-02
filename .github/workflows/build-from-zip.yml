@@ -85,7 +85,7 @@ jobs:
           marker = "</androidx.core.widget.NestedScrollView>"
           missing = s.count("<LinearLayout") - s.count("</LinearLayout>")
           if missing > 0:
-              s = s.replace(marker, ("    </LinearLayout>\\n" * missing) + marker, 1)
+              s = s.replace(marker, ("</LinearLayout>" * missing) + marker, 1)
               p.write_text(s, encoding="utf-8")
 
       - name: Enable AndroidX
