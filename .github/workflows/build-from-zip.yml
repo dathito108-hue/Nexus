@@ -16,7 +16,6 @@ jobs:
     env:
       ANDROID_HOME: /usr/local/lib/android/sdk
       ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
-      PATH: /usr/local/lib/android/sdk/cmdline-tools/16.0/bin:/usr/local/lib/android/sdk/platform-tools:/usr/local/lib/android/sdk/emulator:/usr/local/bin:/usr/bin:/bin
     steps:
       - name: Checkout bootstrap repository
         uses: actions/checkout@v4
@@ -64,10 +63,13 @@ jobs:
           java-version: "17"
           distribution: "temurin"
 
-      - name: Prepare Android SDK
-        run: |
-          yes | sdkmanager --licenses >/dev/null || true
-          sdkmanager --install "platform-tools" "platforms;android-34" "build-tools;34.0.0" "ndk;26.1.10909125" "cmake;3.22.1"
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v4
+        with:
+          packages: "platform-tools"
+
+      - name: Install Android NDK, CMake and SDK platform
+        run: sdkmanager --install "platforms;android-34" "build-tools;34.0.0" "ndk;26.1.10909125" "cmake;3.22.1"
 
       - name: Set up Gradle 8.4
         uses: gradle/actions/setup-gradle@v4
