@@ -1,0 +1,87 @@
+name: Build Hyper-Nexus Nit APK
+
+on:
+  push:
+    branches: [ "main", "master" ]
+  pull_request:
+    branches: [ "main", "master" ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout bootstrap repository
+        uses: actions/checkout@v4
+
+      - name: Extract uploaded project ZIP
+        shell: python
+        run: |
+          import zipfile
+          from pathlib import Path
+          import shutil
+
+          archive = Path("hyper-nexus-nit.zip")
+          if not archive.exists():
+              raise SystemExit("hyper-nexus-nit.zip not found")
+
+          out = Path("_project")
+          if out.exists():
+              shutil.rmtree(out)
+          out.mkdir()
+
+          with zipfile.ZipFile(archive) as z:
+              for info in z.infolist():
+                  name = info.filename.replace("\\", "/").lstrip("/")
+                  if not name or name.endswith("/"):
+                      continue
+                  target = out / name
+                  target.parent.mkdir(parents=True, exist_ok=True)
+                  with z.open(info) as src, target.open("wb") as dst:
+                      shutil.copyfileobj(src, dst)
+
+          for item in out.iterdir():
+              if item.name in {".github", ".git"}:
+                  continue
+              dest = Path(item.name)
+              if dest.exists():
+                  if dest.is_dir():
+                      shutil.rmtree(dest)
+                  else:
+                      dest.unlink()
+              shutil.move(str(item), str(dest))
+
+          workflow_dir = Path(".github/workflows")
+          workflow_dir.mkdir(parents=True, exist_ok=True)
+          for wf in (out / ".github/workflows").glob("*") if (out / ".github/workflows").exists() else []:
+              shutil.copy2(wf, workflow_dir / wf.name)
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: "17"
+          distribution: "temurin"
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android NDK and CMake
+        run: sdkmanager --install "ndk;26.1.10909125" "cmake;3.22.1"
+
+      - name: Set up Gradle 8.4
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.4"
+
+      - name: Build debug APK
+        run: gradle --no-daemon assembleDebug --stacktrace
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: HyperNexus-Nit-Debug-APK
+          path: app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
