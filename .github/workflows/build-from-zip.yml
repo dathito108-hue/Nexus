@@ -83,8 +83,9 @@ jobs:
           p = Path("app/src/main/res/layout/activity_main.xml")
           s = p.read_text(encoding="utf-8")
           marker = "</androidx.core.widget.NestedScrollView>"
-          if s.count("<LinearLayout") > s.count("</LinearLayout>"):
-              s = s.replace(marker, "    </LinearLayout>\\n" + marker, 1)
+          missing = s.count("<LinearLayout") - s.count("</LinearLayout>")
+          if missing > 0:
+              s = s.replace(marker, ("    </LinearLayout>\\n" * missing) + marker, 1)
               p.write_text(s, encoding="utf-8")
 
       - name: Enable AndroidX
