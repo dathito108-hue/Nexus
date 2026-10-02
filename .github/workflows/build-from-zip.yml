@@ -84,39 +84,41 @@ jobs:
           p = Path("app/src/main/res/layout/activity_main.xml")
           s = p.read_text(encoding="utf-8")
 
-          # The uploaded layout accidentally nested ACTION 5+ inside the
-          # INTERNET RAG card. Close ACTION 4 and its row before ACTION 5.
-          marker = '''android:text="🌐 INTERNET RAG"
-                    android:textColor="#FB923C"
-                    android:textSize="12sp"
-                    android:textStyle="bold" />
-
-        <LinearLayout'''
-          replacement = '''android:text="🌐 INTERNET RAG"
-                    android:textColor="#FB923C"
-                    android:textSize="12sp"
-                    android:textStyle="bold" />
-
-                <TextView
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="4dp"
-                    android:text="Tìm kiếm &amp; tổng hợp dữ liệu web thời gian thực"
-                    android:textColor="#64748B"
-                    android:textSize="10sp" />
-            </LinearLayout>
-        </LinearLayout>
-
-        <LinearLayout'''
+          # Close ACTION 4 and its row before ACTION 5.
+          marker = (
+              'android:text="🌐 INTERNET RAG"\n'
+              '                    android:textColor="#FB923C"\n'
+              '                    android:textSize="12sp"\n'
+              '                    android:textStyle="bold" />\n'
+              '\n'
+              '        <LinearLayout'
+          )
+          replacement = (
+              'android:text="🌐 INTERNET RAG"\n'
+              '                    android:textColor="#FB923C"\n'
+              '                    android:textSize="12sp"\n'
+              '                    android:textStyle="bold" />\n'
+              '\n'
+              '                <TextView\n'
+              '                    android:layout_width="match_parent"\n'
+              '                    android:layout_height="wrap_content"\n'
+              '                    android:layout_marginTop="4dp"\n'
+              '                    android:text="Tìm kiếm &amp; tổng hợp dữ liệu web thời gian thực"\n'
+              '                    android:textColor="#64748B"\n'
+              '                    android:textSize="10sp" />\n'
+              '            </LinearLayout>\n'
+              '        </LinearLayout>\n'
+              '\n'
+              '        <LinearLayout'
+          )
           if marker not in s:
               raise SystemExit("Expected INTERNET RAG nesting marker not found")
           s = s.replace(marker, replacement, 1)
 
-          # Keep the XML balanced as a final guard.
-          marker_root = "</androidx.core.widget.NestedScrollView>"
+          root = "</androidx.core.widget.NestedScrollView>"
           missing = s.count("<LinearLayout") - s.count("</LinearLayout>")
           if missing > 0:
-              s = s.replace(marker_root, ("</LinearLayout>" * missing) + marker_root, 1)
+              s = s.replace(root, ("</LinearLayout>" * missing) + root, 1)
 
           p.write_text(s, encoding="utf-8")
 
