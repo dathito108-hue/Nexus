@@ -30,6 +30,8 @@ void ensureBackendInitialized() {
 }
 
 std::string buildQwenPrompt(const std::string & userPrompt) {
+    // Callers may provide an already formatted Qwen chat template.
+    if (userPrompt.find("<|im_start|>") != std::string::npos) return userPrompt;
     return "<|im_start|>system\nBạn là Nít, một trợ lý AI chạy cục bộ trên thiết bị Android. "
            "Trả lời chính xác, hữu ích và trung thực; không tuyên bố đã thực hiện một hành động nếu hành động đó chưa thực sự được thực thi.<|im_end|>\n"
            "<|im_start|>user\n" + userPrompt + "<|im_end|>\n<|im_start|>assistant\n";
