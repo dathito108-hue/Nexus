@@ -13,6 +13,7 @@ copy("ai_src/ContextMemoryManager.kt", "app/src/main/java/com/hypernexus/nit/evo
 copy("ai_src/LlamaEngine.kt", "app/src/main/java/com/hypernexus/nit/engine/LlamaEngine.kt")
 copy("ai_src/ModelManager.kt", "app/src/main/java/com/hypernexus/nit/engine/ModelManager.kt")
 copy("ai_src/LoraHotSwapManager.kt", "app/src/main/java/com/hypernexus/nit/engine/LoraHotSwapManager.kt")
+copy("ai_src/P2AgentBrain.kt", "app/src/main/java/com/hypernexus/nit/router/P2AgentBrain.kt")
 
 p = Path("app/src/main/java/com/hypernexus/nit/router/SystemRouter.kt")
 s = p.read_text(encoding="utf-8")
@@ -50,20 +51,13 @@ end = s.find(return_marker, start)
 if start < 0 or end < 0:
     raise SystemExit("SystemRouter generic region not found")
 
-new_generic = """        // 7. SYSTEM 2: REAL ON-DEVICE AGENT BRAIN
+new_generic = """        // 7. SYSTEM 2: P2 STRUCTURED ON-DEVICE AGENT BRAIN
         else {
             if (!ensureRealModelLoaded()) {
                 finalReply = "Lõi AI cục bộ chưa sẵn sàng. Hãy tải mô hình GGUF Qwen 2.5 1.5B trước."
             } else {
-                val toolCallResult = HybridSemanticDispatcher.executeLlmToolCalling(context, rawInput)
-                if (toolCallResult != null) {
-                    finalReply = toolCallResult
-                } else {
-                    val memoryContext = memoryManager.buildMemoryContext(rawInput)
-                    val systemPrompt = "Bạn là Nít, trợ lý AI chạy cục bộ. Chỉ dùng ký ức được cung cấp trong CONTEXT; nếu không đủ thì nói rõ. Không tuyên bố đã thực hiện hành động nếu công cụ chưa chạy. Trả lời tiếng Việt tự nhiên.\\nCONTEXT:\\n" + memoryContext
-                    val fullPrompt = systemPrompt + "\\n\\nUSER:\\n" + rawInput + "\\nASSISTANT:"
-                    finalReply = LlamaEngine.generateResponse(fullPrompt, maxTokens = 320, temperature = 0.65f)
-                }
+                val agentResult = com.hypernexus.nit.router.P2AgentBrain.run(context, rawInput)
+                finalReply = agentResult ?: "Nít chưa tạo được quyết định có cấu trúc từ mô hình cục bộ."
             }
         }
 
