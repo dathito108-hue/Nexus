@@ -71,6 +71,20 @@ jobs:
       - name: Install Android NDK, CMake and SDK platform
         run: sdkmanager --install "platforms;android-34" "build-tools;34.0.0" "ndk;26.1.10909125" "cmake;3.22.1"
 
+
+      - name: Fetch pinned real llama.cpp runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          LLAMA_CPP_COMMIT="99b95488cac0f00ce3f05af113a8c1e287753f87"
+          rm -rf third_party/llama.cpp
+          mkdir -p third_party/llama.cpp
+          git -C third_party/llama.cpp init
+          git -C third_party/llama.cpp remote add origin https://github.com/ggml-org/llama.cpp.git
+          git -C third_party/llama.cpp fetch --depth 1 origin "$LLAMA_CPP_COMMIT"
+          git -C third_party/llama.cpp checkout --detach FETCH_HEAD
+          test "$(git -C third_party/llama.cpp rev-parse HEAD)" = "$LLAMA_CPP_COMMIT"
+
       - name: Set up Gradle 8.4
         uses: gradle/actions/setup-gradle@v4
         with:
@@ -174,6 +188,20 @@ jobs:
                lambda s: s.replace("MicroRobotOverlayService.RobotState.IDLE", "MicroRobotOverlayService.RobotState.SLEEP")
                            .replace("val clicked = service.clickNodeByText(textOptions)",
                                     "val clicked = textOptions.any { service.clickNodeByText(it) }"))
+
+
+      - name: Verify real AI runtime wiring
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f app/src/main/cpp/native-lib.cpp
+          test -f app/src/main/cpp/CMakeLists.txt
+          grep -q '#include "llama.h"' app/src/main/cpp/native-lib.cpp
+          grep -q 'add_subdirectory' app/src/main/cpp/CMakeLists.txt
+          grep -q 'llama_model_load_from_file' app/src/main/cpp/native-lib.cpp
+          grep -q 'llama_decode' app/src/main/cpp/native-lib.cpp
+          grep -q 'llama_sampler_sample' app/src/main/cpp/native-lib.cpp
+          echo "REAL_AI_RUNTIME_WIRING=OK"
 
       - name: Enable AndroidX
         run: |
