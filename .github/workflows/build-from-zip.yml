@@ -80,7 +80,7 @@ jobs:
 
 
       - name: Apply P1 memory and agent wiring
-        shell: python
+        shell: bash
         run: python ai_src/apply_p1.py
 
       - name: Set up JDK 17
