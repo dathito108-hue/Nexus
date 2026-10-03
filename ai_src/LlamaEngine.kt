@@ -7,6 +7,7 @@ object LlamaEngine {
     external fun generateResponse(prompt: String, maxTokens: Int = 512, temperature: Float = 0.7f): String
     external fun isModelLoaded(): Boolean
     external fun getModelInfo(): String
+    external fun embedText(text: String, maxDims: Int = 384): FloatArray
     external fun unloadModel()
     external fun calculateRSI(prices: DoubleArray, period: Int): DoubleArray
     external fun calculateMACD(prices: DoubleArray, fastPeriod: Int = 12, slowPeriod: Int = 26, signalPeriod: Int = 9): DoubleArray
