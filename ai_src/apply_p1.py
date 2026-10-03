@@ -41,25 +41,13 @@ if old_init not in s:
     raise SystemExit("SystemRouter init block not found")
 s = s.replace(old_init, new_init, 1)
 
-old_generic = """        // 7. SYSTEM 2: AGENTIC TOOL CALLING QUA LLM JSON SCHEMA HOẶC SUY LUẬN SÂU
-        else {
-            // Thử gọi công cụ tự hành thông qua LLM JSON Tool Calling
-            val toolCallResult = HybridSemanticDispatcher.executeLlmToolCalling(context, rawInput)
-            if (toolCallResult != null) {
-                finalReply = toolCallResult
-            } else {
-                val systemPrompt = "Bạn là Nít, trợ lý AI tự hành tối tân trên Samsung Galaxy S21 FE. Hãy phản hồi ngắn gọn, thông minh và súc tích bằng tiếng Việt."
-                val conversationHistory = memoryManager.getRecentSlidingWindowContext()
-                val historyBuilder = StringBuilder()
-                for ((role, content) in conversationHistory) {
-                    historyBuilder.append("<|im_start|>$role\n$content<|im_end|>\n")
-                }
-                val fullPrompt = "<|im_start|>system\n" + systemPrompt + "<|im_end|>\n" + historyBuilder.toString() + "<|im_start|>user\n" + rawInput + "<|im_end|>\n<|im_start|>assistant\n"
-                finalReply = LlamaEngine.generateResponse(fullPrompt, maxTokens = 256, temperature = 0.7f)
-            }
-        }
-"""
-new_generic = """        // 7. SYSTEM 2: REAL ON-DEVICE AGENT BRAIN
+start_marker = "        // 7. SYSTEM 2: AGENTIC TOOL CALLING QUA LLM JSON SCHEMA HOẶC SUY LUẬN SÂU"
+          return_marker = "        return finalReply"
+          start = s.find(start_marker)
+          end = s.find(return_marker, start)
+          if start < 0 or end < 0:
+              raise SystemExit("SystemRouter generic region not found")
+          new_generic = """        // 7. SYSTEM 2: REAL ON-DEVICE AGENT BRAIN
         else {
             if (!ensureRealModelLoaded()) {
                 finalReply = "Lõi AI cục bộ chưa sẵn sàng. Hãy tải mô hình GGUF Qwen 2.5 1.5B trước."
@@ -69,13 +57,15 @@ new_generic = """        // 7. SYSTEM 2: REAL ON-DEVICE AGENT BRAIN
                     finalReply = toolCallResult
                 } else {
                     val memoryContext = memoryManager.buildMemoryContext(rawInput)
-                    val systemPrompt = "Bạn là Nít, trợ lý AI chạy cục bộ. Chỉ dùng ký ức được cung cấp trong CONTEXT; nếu không đủ thì nói rõ. Không tuyên bố đã thực hiện hành động nếu công cụ chưa chạy. Trả lời tiếng Việt tự nhiên.\nCONTEXT:\n" + memoryContext
-                    val fullPrompt = systemPrompt + "\n\nUSER:\n" + rawInput + "\nASSISTANT:"
+                    val systemPrompt = "Bạn là Nít, trợ lý AI chạy cục bộ. Chỉ dùng ký ức được cung cấp trong CONTEXT; nếu không đủ thì nói rõ. Không tuyên bố đã thực hiện hành động nếu công cụ chưa chạy. Trả lời tiếng Việt tự nhiên.\\nCONTEXT:\\n" + memoryContext
+                    val fullPrompt = systemPrompt + "\\n\\nUSER:\\n" + rawInput + "\\nASSISTANT:"
                     finalReply = LlamaEngine.generateResponse(fullPrompt, maxTokens = 320, temperature = 0.65f)
                 }
             }
         }
+
 """
+          s = s[:start] + new_generic + s[end:]
 if old_generic not in s:
     raise SystemExit("SystemRouter generic block not found")
 s = s.replace(old_generic, new_generic, 1)
