@@ -74,8 +74,40 @@ object P2AgentBrain {
             ok[id] = !result.startsWith("LỖI:")
             out.append("• ").append(id).append('/').append(tool).append(": ").append(result).append('\n')
             if (ok[id] != true) return out.append("• Dừng kế hoạch do bước lỗi.").toString().trim()
+
+            // P3: observe -> evaluate -> optionally repair only safe/idempotent tools.
+            val verdict = evaluateResult(input = p.toString(), tool = tool, result = result)
+            out.append("• ").append(id).append("/VERIFY: ").append(verdict).append('\n')
+            if (verdict == "STOP") return out.toString().trim()
+            if (verdict == "RETRY" && tool in RETRYABLE_TOOLS) {
+                val repaired = execute(context, tool, p)
+                ok[id] = !repaired.startsWith("LỖI:")
+                out.append("• ").append(id).append("/RETRY: ").append(repaired).append('\n')
+                if (ok[id] != true) return out.append("• Dừng sau retry lỗi.").toString().trim()
+            }
         }
         return out.toString().trim()
+    }
+
+    private val RETRYABLE_TOOLS = setOf("generate_3d_model", "develop_web_game", "develop_web_app", "quant_market_analyze", "search_screen_memory")
+
+    private fun evaluateResult(input: String, tool: String, result: String): String {
+        val prompt = """
+            <|im_start|>system
+            Bạn là bộ kiểm định của Nít. Chỉ trả về một từ: OK, RETRY hoặc STOP.
+            OK = kết quả phù hợp mục tiêu; RETRY = có thể thử lại an toàn; STOP = không nên tiếp tục.
+            Không yêu cầu retry cho hành động điều khiển thiết bị, tài chính, video hoặc hành động bên ngoài.
+            <|im_end|><|im_start|>user
+            TOOL=$tool
+            PARAMS=$input
+            RESULT=$result
+            <|im_end|><|im_start|>assistant
+        """.trimIndent()
+        return when (LlamaEngine.generateResponse(prompt, maxTokens = 8, temperature = 0.0f).trim().uppercase()) {
+            "RETRY" -> "RETRY"
+            "STOP" -> "STOP"
+            else -> "OK"
+        }
     }
 
     private fun validateEnums(tool: String, p: JSONObject) {
