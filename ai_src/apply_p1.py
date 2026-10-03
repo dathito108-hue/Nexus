@@ -60,8 +60,8 @@ new_generic = """        // 7. SYSTEM 2: REAL ON-DEVICE AGENT BRAIN
                     finalReply = toolCallResult
                 } else {
                     val memoryContext = memoryManager.buildMemoryContext(rawInput)
-                    val systemPrompt = "Bạn là Nít, trợ lý AI chạy cục bộ. Chỉ dùng ký ức được cung cấp trong CONTEXT; nếu không đủ thì nói rõ. Không tuyên bố đã thực hiện hành động nếu công cụ chưa chạy. Trả lời tiếng Việt tự nhiên.\nCONTEXT:\n" + memoryContext
-                    val fullPrompt = systemPrompt + "\n\nUSER:\n" + rawInput + "\nASSISTANT:"
+                    val systemPrompt = "Bạn là Nít, trợ lý AI chạy cục bộ. Chỉ dùng ký ức được cung cấp trong CONTEXT; nếu không đủ thì nói rõ. Không tuyên bố đã thực hiện hành động nếu công cụ chưa chạy. Trả lời tiếng Việt tự nhiên.\\nCONTEXT:\\n" + memoryContext
+                    val fullPrompt = systemPrompt + "\\n\\nUSER:\\n" + rawInput + "\\nASSISTANT:"
                     finalReply = LlamaEngine.generateResponse(fullPrompt, maxTokens = 320, temperature = 0.65f)
                 }
             }
