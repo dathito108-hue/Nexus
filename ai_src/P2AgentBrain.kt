@@ -96,7 +96,6 @@ object P2AgentBrain {
             val startedAt = System.nanoTime()
             val result = execute(context, tool, p)
             val latencyMs = (System.nanoTime() - startedAt) / 1_000_000
-            val riskClass = risk[tool] ?: Risk.READ_ONLY
             Log.i(TAG, "TRACE id=" + id + " tool=" + tool + " risk=" + riskClass + " latencyMs=" + latencyMs + " ok=" + !result.startsWith("LỖI:"))
             ok[id] = !result.startsWith("LỖI:")
             out.append("• ").append(id).append('/').append(tool).append(": ").append(result).append('\n')
