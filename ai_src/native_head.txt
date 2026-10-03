@@ -110,6 +110,60 @@ std::string generateLocked(const std::string & prompt, int maxTokens, float temp
     llama_sampler_free(sampler);
     llama_free(ctx);
     return output.empty() ? "[NIT_ERROR:empty_generation]" : output;
+
+
+std::vector<float> embedLocked(const std::string & text, int maxDims) {
+    if (!g_model || text.empty()) return {};
+    const llama_vocab * vocab = llama_model_get_vocab(g_model);
+    std::vector<llama_token> tokens;
+    if (!tokenize(vocab, text, tokens) || tokens.empty()) return {};
+
+    constexpr uint32_t kEmbedContext = 512;
+    if (tokens.size() > kEmbedContext) tokens.resize(kEmbedContext);
+
+    llama_context_params params = llama_context_default_params();
+    params.n_ctx = kEmbedContext;
+    params.n_batch = kEmbedContext;
+    params.n_ubatch = kEmbedContext;
+    params.n_seq_max = 1;
+    params.n_threads = 6;
+    params.n_threads_batch = 6;
+    params.embeddings = true;
+    params.pooling_type = LLAMA_POOLING_TYPE_LAST;
+    params.attention_type = LLAMA_ATTENTION_TYPE_CAUSAL;
+    params.flash_attn_type = LLAMA_FLASH_ATTN_TYPE_AUTO;
+
+    llama_context * ctx = llama_init_from_model(g_model, params);
+    if (!ctx) return {};
+
+    llama_batch batch = llama_batch_get_one(tokens.data(), static_cast<int32_t>(tokens.size()));
+    const int ret = llama_decode(ctx, batch);
+    if (ret != 0) {
+        llama_free(ctx);
+        return {};
+    }
+
+    const float * emb = llama_get_embeddings_seq(ctx, 0);
+    if (!emb) {
+        llama_free(ctx);
+        return {};
+    }
+
+    const int fullDims = llama_model_n_embd_out(g_model);
+    const int dims = std::max(1, std::min(maxDims, fullDims));
+    std::vector<float> out(static_cast<size_t>(dims), 0.0f);
+    double norm = 0.0;
+    for (int i = 0; i < dims; ++i) {
+        out[static_cast<size_t>(i)] = emb[i];
+        norm += static_cast<double>(emb[i]) * emb[i];
+    }
+    norm = std::sqrt(norm);
+    if (norm > 0.0) {
+        for (float & v : out) v = static_cast<float>(v / norm);
+    }
+    llama_free(ctx);
+    return out;
+}
 }
 }
 
@@ -168,6 +222,21 @@ Java_com_hypernexus_nit_engine_LlamaEngine_generateResponse(
     std::lock_guard<std::mutex> lock(g_runtimeMutex);
     const std::string result = generateLocked(promptStr, maxTokens, temperature);
     return env->NewStringUTF(result.c_str());
+}
+
+extern "C" JNIEXPORT jfloatArray JNICALL
+Java_com_hypernexus_nit_engine_LlamaEngine_embedText(
+        JNIEnv * env, jobject, jstring text, jint maxDims) {
+    const char * input = env->GetStringUTFChars(text, nullptr);
+    const std::string value(input ? input : "");
+    env->ReleaseStringUTFChars(text, input);
+
+    std::lock_guard<std::mutex> lock(g_runtimeMutex);
+    const std::vector<float> emb = embedLocked(value, std::max(16, static_cast<int>(maxDims)));
+    jfloatArray arr = env->NewFloatArray(static_cast<jsize>(emb.size()));
+    if (!arr || emb.empty()) return arr;
+    env->SetFloatArrayRegion(arr, 0, static_cast<jsize>(emb.size()), emb.data());
+    return arr;
 }
 
 extern "C" JNIEXPORT jboolean JNICALL
