@@ -39,12 +39,12 @@ object P2AgentBrain {
         val json = extractJson(raw) ?: return null
         return when (json.optString("mode")) {
             "chat" -> json.optString("answer").trim().ifEmpty { null }
-            "tools" -> executeGraph(context, json.optJSONArray("tools") ?: JSONArray())
+            "tools" -> executeGraph(context, input, json.optJSONArray("tools") ?: JSONArray())
             else -> null
         }
     }
 
-    private suspend fun executeGraph(context: Context, steps: JSONArray): String {
+    private suspend fun executeGraph(context: Context, goal: String, steps: JSONArray): String {
         if (steps.length() == 0 || steps.length() > 8) return "Kế hoạch hành động không hợp lệ: số bước phải từ 1 đến 8."
         val seen = mutableSetOf<String>()
         val ok = mutableMapOf<String, Boolean>()
@@ -76,7 +76,7 @@ object P2AgentBrain {
             if (ok[id] != true) return out.append("• Dừng kế hoạch do bước lỗi.").toString().trim()
 
             // P3: observe -> evaluate -> optionally repair only safe/idempotent tools.
-            val verdict = evaluateResult(input = p.toString(), tool = tool, result = result)
+            val verdict = evaluateResult(input = goal, tool = tool, result = result)
             out.append("• ").append(id).append("/VERIFY: ").append(verdict).append('\n')
             if (verdict == "STOP") return out.toString().trim()
             if (verdict == "RETRY" && tool in RETRYABLE_TOOLS) {
