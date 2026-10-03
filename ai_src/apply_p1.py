@@ -15,6 +15,7 @@ copy("ai_src/ModelManager.kt", "app/src/main/java/com/hypernexus/nit/engine/Mode
 copy("ai_src/LoraHotSwapManager.kt", "app/src/main/java/com/hypernexus/nit/engine/LoraHotSwapManager.kt")
 copy("ai_src/P2AgentBrain.kt", "app/src/main/java/com/hypernexus/nit/router/P2AgentBrain.kt")
 copy("ai_src/AgentExecutionJournal.kt", "app/src/main/java/com/hypernexus/nit/router/AgentExecutionJournal.kt")
+copy("ai_src/SkillRegistry.kt", "app/src/main/java/com/hypernexus/nit/router/SkillRegistry.kt")
 
 p = Path("app/src/main/java/com/hypernexus/nit/router/SystemRouter.kt")
 s = p.read_text(encoding="utf-8")
