@@ -1,0 +1,209 @@
+#include <jni.h>
+#include <string>
+#include <vector>
+#include <numeric>
+#include <cmath>
+#include <algorithm>
+#include <sstream>
+#include <fstream>
+#include <cstring>
+#include <mutex>
+#include <android/log.h>
+
+#include "llama.h"
+
+#define TAG "HyperNexusNative"
+#define LOGD(...) __android_log_print(ANDROID_LOG_DEBUG, TAG, __VA_ARGS__)
+#define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, TAG, __VA_ARGS__)
+
+namespace {
+std::mutex g_runtimeMutex;
+llama_model * g_model = nullptr;
+std::string g_loadedModelPath;
+bool g_backendInitialized = false;
+
+void ensureBackendInitialized() {
+    if (!g_backendInitialized) {
+        llama_backend_init();
+        g_backendInitialized = true;
+    }
+}
+
+std::string buildQwenPrompt(const std::string & userPrompt) {
+    return "<|im_start|>system\nBạn là Nít, một trợ lý AI chạy cục bộ trên thiết bị Android. "
+           "Trả lời chính xác, hữu ích và trung thực; không tuyên bố đã thực hiện một hành động nếu hành động đó chưa thực sự được thực thi.<|im_end|>\n"
+           "<|im_start|>user\n" + userPrompt + "<|im_end|>\n<|im_start|>assistant\n";
+}
+
+bool tokenize(const llama_vocab * vocab, const std::string & text, std::vector<llama_token> & out) {
+    const int32_t n = llama_tokenize(vocab, text.c_str(), static_cast<int32_t>(text.size()), nullptr, 0, true, true);
+    if (n <= 0) return n == 0;
+    out.resize(static_cast<size_t>(n));
+    const int32_t actual = llama_tokenize(vocab, text.c_str(), static_cast<int32_t>(text.size()), out.data(), n, true, true);
+    if (actual < 0) { out.clear(); return false; }
+    out.resize(static_cast<size_t>(actual));
+    return true;
+}
+
+std::string generateLocked(const std::string & prompt, int maxTokens, float temperature) {
+    if (!g_model) return "[NIT_ERROR:model_not_loaded]";
+    const llama_vocab * vocab = llama_model_get_vocab(g_model);
+    const std::string formatted = buildQwenPrompt(prompt);
+    std::vector<llama_token> promptTokens;
+    if (!tokenize(vocab, formatted, promptTokens)) return "[NIT_ERROR:tokenization_failed]";
+
+    constexpr uint32_t kContext = 4096;
+    constexpr uint32_t kBatch = 512;
+    if (promptTokens.size() >= kContext - 8) return "[NIT_ERROR:prompt_too_long]";
+
+    llama_context_params ctxParams = llama_context_default_params();
+    ctxParams.n_ctx = kContext;
+    ctxParams.n_batch = kBatch;
+    ctxParams.n_ubatch = kBatch;
+    ctxParams.n_seq_max = 1;
+    ctxParams.n_threads = 6;
+    ctxParams.n_threads_batch = 6;
+    ctxParams.flash_attn_type = LLAMA_FLASH_ATTN_TYPE_AUTO;
+
+    llama_context * ctx = llama_init_from_model(g_model, ctxParams);
+    if (!ctx) return "[NIT_ERROR:context_init_failed]";
+
+    llama_sampler * sampler = llama_sampler_chain_init(llama_sampler_chain_default_params());
+    if (!sampler) { llama_free(ctx); return "[NIT_ERROR:sampler_init_failed]"; }
+
+    const float temp = std::clamp(temperature, 0.05f, 1.5f);
+    llama_sampler_chain_add(sampler, llama_sampler_init_top_k(40));
+    llama_sampler_chain_add(sampler, llama_sampler_init_top_p(0.92f, 1));
+    llama_sampler_chain_add(sampler, llama_sampler_init_temp(temp));
+    llama_sampler_chain_add(sampler, llama_sampler_init_dist(LLAMA_DEFAULT_SEED));
+
+    llama_batch batch = llama_batch_get_one(promptTokens.data(), static_cast<int32_t>(promptTokens.size()));
+    int ret = llama_decode(ctx, batch);
+    if (ret != 0) {
+        llama_sampler_free(sampler);
+        llama_free(ctx);
+        return "[NIT_ERROR:prompt_decode_failed:" + std::to_string(ret) + "]";
+    }
+
+    std::string output;
+    output.reserve(static_cast<size_t>(maxTokens) * 4);
+    const int limit = std::max(1, std::min(maxTokens, 1024));
+    for (int i = 0; i < limit; ++i) {
+        const llama_token token = llama_sampler_sample(sampler, ctx, -1);
+        if (llama_vocab_is_eog(vocab, token)) break;
+
+        char piece[256];
+        const int32_t n = llama_token_to_piece(vocab, token, piece, sizeof(piece), 0, true);
+        if (n > 0) output.append(piece, static_cast<size_t>(n));
+
+        llama_token nextToken = token;
+        batch = llama_batch_get_one(&nextToken, 1);
+        ret = llama_decode(ctx, batch);
+        if (ret != 0) {
+            LOGE("llama_decode generation failed: %d", ret);
+            break;
+        }
+    }
+
+    llama_sampler_free(sampler);
+    llama_free(ctx);
+    return output.empty() ? "[NIT_ERROR:empty_generation]" : output;
+}
+}
+
+extern "C" JNIEXPORT jstring JNICALL
+Java_com_hypernexus_nit_engine_LlamaEngine_getNativeVersion(JNIEnv * env, jobject) {
+    std::lock_guard<std::mutex> lock(g_runtimeMutex);
+    ensureBackendInitialized();
+    const std::string version = std::string("Nít Real LLM Runtime / llama.cpp ") + llama_version();
+    return env->NewStringUTF(version.c_str());
+}
+
+extern "C" JNIEXPORT jboolean JNICALL
+Java_com_hypernexus_nit_engine_LlamaEngine_initModel(JNIEnv * env, jobject, jstring modelPath) {
+    const char * path = env->GetStringUTFChars(modelPath, nullptr);
+    const std::string pathStr(path ? path : "");
+    env->ReleaseStringUTFChars(modelPath, path);
+
+    std::lock_guard<std::mutex> lock(g_runtimeMutex);
+    ensureBackendInitialized();
+
+    if (g_model && g_loadedModelPath == pathStr) return JNI_TRUE;
+    if (g_model) {
+        llama_model_free(g_model);
+        g_model = nullptr;
+        g_loadedModelPath.clear();
+    }
+
+    llama_model_params params = llama_model_default_params();
+    params.n_gpu_layers = 0;
+    params.use_extra_bufts = true;
+    params.load_mode = LLAMA_LOAD_MODE_MMAP;
+
+    LOGD("Loading REAL GGUF model: %s", pathStr.c_str());
+    g_model = llama_model_load_from_file(pathStr.c_str(), params);
+    if (!g_model) {
+        LOGE("Failed to load GGUF model: %s", pathStr.c_str());
+        return JNI_FALSE;
+    }
+
+    g_loadedModelPath = pathStr;
+    LOGD("REAL LLM loaded: layers=%d embd=%d vocab=%d ctx_train=%d size=%llu",
+         llama_model_n_layer(g_model), llama_model_n_embd(g_model),
+         llama_vocab_n_tokens(llama_model_get_vocab(g_model)),
+         llama_model_n_ctx_train(g_model),
+         static_cast<unsigned long long>(llama_model_size(g_model)));
+    return JNI_TRUE;
+}
+
+extern "C" JNIEXPORT jstring JNICALL
+Java_com_hypernexus_nit_engine_LlamaEngine_generateResponse(
+        JNIEnv * env, jobject, jstring prompt, jint maxTokens, jfloat temperature) {
+    const char * input = env->GetStringUTFChars(prompt, nullptr);
+    const std::string promptStr(input ? input : "");
+    env->ReleaseStringUTFChars(prompt, input);
+
+    std::lock_guard<std::mutex> lock(g_runtimeMutex);
+    const std::string result = generateLocked(promptStr, maxTokens, temperature);
+    return env->NewStringUTF(result.c_str());
+}
+
+extern "C" JNIEXPORT jboolean JNICALL
+Java_com_hypernexus_nit_engine_LlamaEngine_isModelLoaded(JNIEnv *, jobject) {
+    std::lock_guard<std::mutex> lock(g_runtimeMutex);
+    return g_model ? JNI_TRUE : JNI_FALSE;
+}
+
+extern "C" JNIEXPORT jstring JNICALL
+Java_com_hypernexus_nit_engine_LlamaEngine_getModelInfo(JNIEnv * env, jobject) {
+    std::lock_guard<std::mutex> lock(g_runtimeMutex);
+    if (!g_model) return env->NewStringUTF("model=none");
+
+    char desc[256] = {};
+    llama_model_desc(g_model, desc, sizeof(desc));
+    std::ostringstream ss;
+    ss << "path=" << g_loadedModelPath
+       << ";layers=" << llama_model_n_layer(g_model)
+       << ";embd=" << llama_model_n_embd(g_model)
+       << ";vocab=" << llama_vocab_n_tokens(llama_model_get_vocab(g_model))
+       << ";ctx_train=" << llama_model_n_ctx_train(g_model)
+       << ";size_bytes=" << llama_model_size(g_model)
+       << ";type=" << desc;
+    return env->NewStringUTF(ss.str().c_str());
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_hypernexus_nit_engine_LlamaEngine_unloadModel(JNIEnv *, jobject) {
+    std::lock_guard<std::mutex> lock(g_runtimeMutex);
+    if (g_model) llama_model_free(g_model);
+    g_model = nullptr;
+    g_loadedModelPath.clear();
+}
+
+extern "C" JNIEXPORT jboolean JNICALL
+Java_com_hypernexus_nit_engine_LlamaEngine_mergeLoRAWeights(
+        JNIEnv *, jobject, jstring, jstring, jfloat) {
+    // No fake weight mutation. Real adapter training/merge is a separate phase.
+    return JNI_FALSE;
+}
+
