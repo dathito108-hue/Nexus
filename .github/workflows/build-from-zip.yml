@@ -69,7 +69,11 @@ jobs:
           if marker not in current:
               raise SystemExit("native-lib.cpp marker not found")
           head = Path("ai_src/native_head.txt").read_text(encoding="utf-8")
-          native.write_text(head + current[current.index(marker):], encoding="utf-8")
+          tail = current[current.index(marker):]
+          lora_marker = "// =========================================================================\\n// 3. REAL LORA TENSOR WEIGHT MERGER (BINARY MODIFICATION ON DISK)"
+          if lora_marker in tail:
+              tail = tail[:tail.index(lora_marker)]
+          native.write_text(head + tail, encoding="utf-8")
 
           cmake = Path("ai_src/CMakeLists.txt").read_text(encoding="utf-8")
           Path("app/src/main/cpp/CMakeLists.txt").write_text(cmake, encoding="utf-8")
