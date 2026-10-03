@@ -57,6 +57,23 @@ jobs:
                       dest.unlink()
               shutil.move(str(item), str(dest))
 
+
+      - name: Apply real AI runtime source overlay
+        shell: python
+        run: |
+          from pathlib import Path
+
+          native = Path("app/src/main/cpp/native-lib.cpp")
+          current = native.read_text(encoding="utf-8")
+          marker = "// =========================================================================\\n// 2. REAL MATH: QUANT PRO ALGORITHMS"
+          if marker not in current:
+              raise SystemExit("native-lib.cpp marker not found")
+          head = Path("ai_src/native_head.txt").read_text(encoding="utf-8")
+          native.write_text(head + current[current.index(marker):], encoding="utf-8")
+
+          cmake = Path("ai_src/CMakeLists.txt").read_text(encoding="utf-8")
+          Path("app/src/main/cpp/CMakeLists.txt").write_text(cmake, encoding="utf-8")
+
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
@@ -201,6 +218,20 @@ jobs:
           grep -q 'llama_model_load_from_file' app/src/main/cpp/native-lib.cpp
           grep -q 'llama_decode' app/src/main/cpp/native-lib.cpp
           grep -q 'llama_sampler_sample' app/src/main/cpp/native-lib.cpp
+          echo "REAL_AI_RUNTIME_WIRING=OK"
+
+
+      - name: Verify real AI runtime wiring
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -q '#include "llama.h"' app/src/main/cpp/native-lib.cpp
+          grep -q 'llama_model_load_from_file' app/src/main/cpp/native-lib.cpp
+          grep -q 'llama_decode' app/src/main/cpp/native-lib.cpp
+          grep -q 'llama_sampler_sample' app/src/main/cpp/native-lib.cpp
+          grep -q 'add_subdirectory' app/src/main/cpp/CMakeLists.txt
+          test -f ai_src/native_head.txt
+          test -d third_party/llama.cpp
           echo "REAL_AI_RUNTIME_WIRING=OK"
 
       - name: Enable AndroidX
