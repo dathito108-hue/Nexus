@@ -275,4 +275,4 @@ Java_com_hypernexus_nit_engine_LlamaEngine_mergeLoRAWeights(
     // No fake weight mutation. Real adapter training/merge is a separate phase.
     return JNI_FALSE;
 }
-
+}
