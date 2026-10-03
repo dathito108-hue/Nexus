@@ -65,7 +65,7 @@ jobs:
 
           native = Path("app/src/main/cpp/native-lib.cpp")
           current = native.read_text(encoding="utf-8")
-          marker = "// =========================================================================\\n// 2. REAL MATH: QUANT PRO ALGORITHMS"
+          marker = "// =========================================================================\n// 2. REAL MATH: QUANT PRO ALGORITHMS"
           if marker not in current:
               raise SystemExit("native-lib.cpp marker not found")
           head = Path("ai_src/native_head.txt").read_text(encoding="utf-8")
