@@ -110,7 +110,7 @@ std::string generateLocked(const std::string & prompt, int maxTokens, float temp
     llama_sampler_free(sampler);
     llama_free(ctx);
     return output.empty() ? "[NIT_ERROR:empty_generation]" : output;
-
+}
 
 std::vector<float> embedLocked(const std::string & text, int maxDims) {
     if (!g_model || text.empty()) return {};
@@ -163,8 +163,6 @@ std::vector<float> embedLocked(const std::string & text, int maxDims) {
     }
     llama_free(ctx);
     return out;
-}
-}
 }
 
 extern "C" JNIEXPORT jstring JNICALL
