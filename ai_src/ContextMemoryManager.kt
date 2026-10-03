@@ -182,15 +182,13 @@ class ContextMemoryManager(context: Context) : SQLiteOpenHelper(context, "hyper_
         }
     }
 
-    private fun neuralEmbedding(text: String): FloatArray? {
-        return try {
+    private fun neuralEmbedding(text: String): FloatArray? = try {
             if (!LlamaEngine.isModelLoaded()) null
             else LlamaEngine.embedText(text.take(2400), NEURAL_DIMS).takeIf { it.size >= 32 }
         } catch (t: Throwable) {
             Log.w(TAG, "neural embedding unavailable; using local fallback", t)
             null
         }
-    }
 
     private fun encodeEmbedding(values: FloatArray): ByteArray {
         val buffer = ByteBuffer.allocate(values.size * 4).order(ByteOrder.LITTLE_ENDIAN)
@@ -198,8 +196,7 @@ class ContextMemoryManager(context: Context) : SQLiteOpenHelper(context, "hyper_
         return buffer.array()
     }
 
-    private fun decodeEmbedding(bytes: ByteArray): FloatArray? {
-        return try {
+    private fun decodeEmbedding(bytes: ByteArray): FloatArray? = try {
             if (bytes.isEmpty() || bytes.size % 4 != 0) null
             else {
                 val buffer = ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN)
@@ -208,7 +205,6 @@ class ContextMemoryManager(context: Context) : SQLiteOpenHelper(context, "hyper_
         } catch (_: Exception) {
             null
         }
-    }
 
     private fun cosineFloat(a: FloatArray, b: FloatArray): Double {
         var dot = 0.0
