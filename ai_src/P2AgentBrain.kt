@@ -50,17 +50,33 @@ object P2AgentBrain {
             <|im_end|><|im_start|>user
             $input<|im_end|><|im_start|>assistant
         """.trimIndent()
+        val journal = AgentExecutionJournal(context)
+        val runId = journal.startRun(input)
+        journal.prune()
         val raw = LlamaEngine.generateResponse(prompt, maxTokens = 320, temperature = 0.2f)
-        val json = extractJson(raw) ?: return null
+        journal.recordStep(runId, null, null, "PLAN", "GENERATED", detail = raw.take(1500))
+        val json = extractJson(raw) ?: run {
+            journal.finishRun(runId, "INVALID_PLAN", "Không trích xuất được JSON kế hoạch.")
+            return null
+        }
         return when (json.optString("mode")) {
-            "chat" -> json.optString("answer").trim().ifEmpty { null }
-            "tools" -> executeGraph(context, input, json.optJSONArray("tools") ?: JSONArray())
-            else -> null
+            "chat" -> json.optString("answer").trim().ifEmpty { null }.also { answer ->
+                journal.finishRun(runId, "CHAT", answer)
+            }
+            "tools" -> executeGraph(context, input, json.optJSONArray("tools") ?: JSONArray(), journal, runId)
+            else -> {
+                journal.finishRun(runId, "INVALID_MODE", "mode không hợp lệ.")
+                null
+            }
         }
     }
 
-    private suspend fun executeGraph(context: Context, goal: String, steps: JSONArray): String {
-        if (steps.length() == 0 || steps.length() > 8) return "Kế hoạch hành động không hợp lệ: số bước phải từ 1 đến 8."
+    private suspend fun executeGraph(context: Context, goal: String, steps: JSONArray, journal: AgentExecutionJournal, runId: String): String {
+        if (steps.length() == 0 || steps.length() > 8) {
+            val msg = "Kế hoạch hành động không hợp lệ: số bước phải từ 1 đến 8."
+            journal.finishRun(runId, "INVALID_PLAN", msg)
+            return msg
+        }
         val seen = mutableSetOf<String>()
         val ok = mutableMapOf<String, Boolean>()
         val out = StringBuilder("⚡ [AGENT PLAN]\n")
@@ -94,6 +110,7 @@ object P2AgentBrain {
                 if (ok[d] != true) { ok[id] = false; out.append("• ").append(id).append(": SKIPPED\n"); continue }
             }
             val startedAt = System.nanoTime()
+            journal.recordStep(runId, id, tool, "EXECUTE", "STARTED", detail = p.toString().take(1000))
             val result = execute(context, tool, p)
             val latencyMs = (System.nanoTime() - startedAt) / 1_000_000
             Log.i(TAG, "TRACE id=" + id + " tool=" + tool + " risk=" + riskClass + " latencyMs=" + latencyMs + " ok=" + !result.startsWith("LỖI:"))
@@ -124,6 +141,7 @@ object P2AgentBrain {
                     }
                     repairCount[id] = (repairCount[id] ?: 0) + 1
                     val repairStartedAt = System.nanoTime()
+                    journal.recordStep(runId, id, tool, "REPAIR", "STARTED", detail = repairedParams.toString().take(1000))
                     val repaired = execute(context, tool, repairedParams)
                     val repairLatencyMs = (System.nanoTime() - repairStartedAt) / 1_000_000
                     Log.i(TAG, "TRACE id=" + id + " tool=" + tool + " risk=" + risk[tool] + " latencyMs=" + repairLatencyMs + " phase=REPAIR")
@@ -133,7 +151,9 @@ object P2AgentBrain {
                 }
             }
         }
-        return out.toString().trim()
+        val summary = out.toString().trim()
+        journal.finishRun(runId, if (ok.values.all { it }) "COMPLETED" else "STOPPED", summary)
+        return summary
     }
 
     private val REPAIRABLE_TOOLS = setOf("generate_3d_model", "develop_web_game", "develop_web_app", "search_screen_memory")
