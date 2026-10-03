@@ -5,6 +5,7 @@ def copy(src_name, dst_name):
     dst = Path(dst_name)
     if not src.exists():
         raise SystemExit("missing overlay: " + src_name)
+    dst = Path(dst_name)
     dst.parent.mkdir(parents=True, exist_ok=True)
     dst.write_text(src.read_text(encoding="utf-8"), encoding="utf-8")
 
@@ -19,6 +20,7 @@ s = s.replace(
     "import kotlinx.coroutines.runBlocking\nimport kotlinx.coroutines.withContext\n",
     "import kotlinx.coroutines.runBlocking\nimport kotlinx.coroutines.sync.Mutex\nimport kotlinx.coroutines.sync.withLock\nimport kotlinx.coroutines.withContext\n"
 )
+
 old_init = """    init {
         // Tự động nạp mô hình vào GPU Mali-G78 nếu file GGUF đã có sẵn
         if (ModelManager.isModelReady(context)) {
@@ -42,12 +44,13 @@ if old_init not in s:
 s = s.replace(old_init, new_init, 1)
 
 start_marker = "        // 7. SYSTEM 2: AGENTIC TOOL CALLING QUA LLM JSON SCHEMA HOẶC SUY LUẬN SÂU"
-          return_marker = "        return finalReply"
-          start = s.find(start_marker)
-          end = s.find(return_marker, start)
-          if start < 0 or end < 0:
-              raise SystemExit("SystemRouter generic region not found")
-          new_generic = """        // 7. SYSTEM 2: REAL ON-DEVICE AGENT BRAIN
+return_marker = "        return finalReply"
+start = s.find(start_marker)
+end = s.find(return_marker, start)
+if start < 0 or end < 0:
+    raise SystemExit("SystemRouter generic region not found")
+
+new_generic = """        // 7. SYSTEM 2: REAL ON-DEVICE AGENT BRAIN
         else {
             if (!ensureRealModelLoaded()) {
                 finalReply = "Lõi AI cục bộ chưa sẵn sàng. Hãy tải mô hình GGUF Qwen 2.5 1.5B trước."
@@ -57,18 +60,15 @@ start_marker = "        // 7. SYSTEM 2: AGENTIC TOOL CALLING QUA LLM JSON SCHEMA
                     finalReply = toolCallResult
                 } else {
                     val memoryContext = memoryManager.buildMemoryContext(rawInput)
-                    val systemPrompt = "Bạn là Nít, trợ lý AI chạy cục bộ. Chỉ dùng ký ức được cung cấp trong CONTEXT; nếu không đủ thì nói rõ. Không tuyên bố đã thực hiện hành động nếu công cụ chưa chạy. Trả lời tiếng Việt tự nhiên.\\nCONTEXT:\\n" + memoryContext
-                    val fullPrompt = systemPrompt + "\\n\\nUSER:\\n" + rawInput + "\\nASSISTANT:"
+                    val systemPrompt = "Bạn là Nít, trợ lý AI chạy cục bộ. Chỉ dùng ký ức được cung cấp trong CONTEXT; nếu không đủ thì nói rõ. Không tuyên bố đã thực hiện hành động nếu công cụ chưa chạy. Trả lời tiếng Việt tự nhiên.\nCONTEXT:\n" + memoryContext
+                    val fullPrompt = systemPrompt + "\n\nUSER:\n" + rawInput + "\nASSISTANT:"
                     finalReply = LlamaEngine.generateResponse(fullPrompt, maxTokens = 320, temperature = 0.65f)
                 }
             }
         }
 
 """
-          s = s[:start] + new_generic + s[end:]
-if old_generic not in s:
-    raise SystemExit("SystemRouter generic block not found")
-s = s.replace(old_generic, new_generic, 1)
+s = s[:start] + new_generic + s[end:]
 p.write_text(s, encoding="utf-8")
 
 d = Path("app/src/main/java/com/hypernexus/nit/router/HybridSemanticDispatcher.kt")
