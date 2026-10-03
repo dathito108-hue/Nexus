@@ -56,7 +56,8 @@ new_generic = """        // 7. SYSTEM 2: P2 STRUCTURED ON-DEVICE AGENT BRAIN
             if (!ensureRealModelLoaded()) {
                 finalReply = "Lõi AI cục bộ chưa sẵn sàng. Hãy tải mô hình GGUF Qwen 2.5 1.5B trước."
             } else {
-                val agentResult = com.hypernexus.nit.router.P2AgentBrain.run(context, rawInput)
+                val memoryContext = memoryManager.buildMemoryContext(rawInput, maxChars = 5000)
+                val agentResult = com.hypernexus.nit.router.P2AgentBrain.run(context, rawInput, memoryContext)
                 finalReply = agentResult ?: "Nít chưa tạo được quyết định có cấu trúc từ mô hình cục bộ."
             }
         }
