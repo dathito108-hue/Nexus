@@ -71,7 +71,7 @@ generic_old = """        else {
                     historyBuilder.append("<|im_start|>$role\\n$content<|im_end|>\\n")
                 }
 
-                val fullPrompt = "<|im_start|>system\\n$systemPrompt<|im_end|>\\n$\{historyBuilder}<|im_start|>user\\n$rawInput<|im_end|>\\n<|im_start|>assistant\\n"
+                val fullPrompt = "<|im_start|>system\\n$systemPrompt<|im_end|>\\n${historyBuilder}<|im_start|>user\\n$rawInput<|im_end|>\\n<|im_start|>assistant\\n"
                 finalReply = LlamaEngine.generateResponse(fullPrompt, maxTokens = 256, temperature = 0.7f)
             }
         }"""
