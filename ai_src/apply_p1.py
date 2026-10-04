@@ -22,6 +22,7 @@ copy("ai_src/AgentScheduler.kt", "app/src/main/java/com/hypernexus/nit/router/Ag
 copy("ai_src/AgentBudget.kt", "app/src/main/java/com/hypernexus/nit/router/AgentBudget.kt")
 copy("ai_src/AgentHealth.kt", "app/src/main/java/com/hypernexus/nit/router/AgentHealth.kt")
 copy("ai_src/LanguageModelCore.kt", "app/src/main/java/com/hypernexus/nit/router/LanguageModelCore.kt")
+copy("ai_src/IntentRouter.kt", "app/src/main/java/com/hypernexus/nit/router/IntentRouter.kt")
 
 p = Path("app/src/main/java/com/hypernexus/nit/router/SystemRouter.kt")
 s = p.read_text(encoding="utf-8")
@@ -52,8 +53,21 @@ if old_init not in s:
     raise SystemExit("SystemRouter init block not found")
 s = s.replace(old_init, new_init, 1)
 
-start_marker = "        // 7. SYSTEM 2: AGENTIC TOOL CALLING QUA LLM JSON SCHEMA HOẶC SUY LUẬN SÂU"
-return_marker = "        return finalReply"
+start_marker = "        // 7. PRIMARY LANGUAGE MODEL + SEMANTIC AGENT GATE.
+        // The LLM decides CHAT vs AGENT for ambiguous requests.
+        // P2AgentBrain remains the only authority for tool planning/validation.
+        else {
+            val routeDecision = com.hypernexus.nit.router.IntentRouter.decide(rawInput)
+            finalReply = if (routeDecision.route == com.hypernexus.nit.router.IntentRouter.Route.AGENT) {
+                val memoryContext = memoryManager.buildMemoryContext(rawInput, maxChars = 3600)
+                val agentResult = com.hypernexus.nit.router.P2AgentBrain.run(context, rawInput, memoryContext)
+                agentResult ?: com.hypernexus.nit.router.LanguageModelCore.respond(context, rawInput)
+            } else {
+                com.hypernexus.nit.router.LanguageModelCore.respond(context, rawInput)
+            }
+        }
+
+        return finalReply"
 start = s.find(start_marker)
 end = s.find(return_marker, start)
 if start < 0 or end < 0:
