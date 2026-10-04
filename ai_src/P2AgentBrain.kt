@@ -18,6 +18,9 @@ object P2AgentBrain {
 
     suspend fun run(context: Context, input: String, memoryContext: String = ""): String? {
         val journal = AgentExecutionJournal(context)
+        val lifecycle = AgentLifecycle(context)
+        val lifecycleRunId = lifecycle.createRun(input, budgetSteps = AgentBudget.MAX_STEPS)
+        lifecycle.transition(lifecycleRunId, AgentLifecycle.State.PLANNING)
         val runId = journal.startRun(input)
         journal.prune()
 
@@ -41,6 +44,7 @@ object P2AgentBrain {
         """.trimIndent()
 
         val raw = LlamaEngine.generateResponse(prompt, maxTokens = 320, temperature = 0.2f)
+        lifecycle.transition(lifecycleRunId, AgentLifecycle.State.READY)
         journal.recordStep(runId, null, null, "PLAN", "GENERATED", detail = raw.take(1500))
         val json = extractJson(raw) ?: run {
             journal.finishRun(runId, "INVALID_PLAN", "Không trích xuất được JSON kế hoạch.")
@@ -72,8 +76,10 @@ object P2AgentBrain {
         journal: AgentExecutionJournal,
         runId: String
     ): String {
+        val lifecycle = AgentLifecycle(context)
         fun stop(status: String, message: String): String {
             journal.finishRun(runId, status, message)
+            lifecycle.transition(runId, if (status == "COMPLETED") AgentLifecycle.State.COMPLETED else AgentLifecycle.State.FAILED, error = if (status == "FAILED") message else null)
             return message
         }
 
@@ -86,7 +92,10 @@ object P2AgentBrain {
         val repairCount = mutableMapOf<String, Int>()
         val out = StringBuilder("⚡ [AGENT PLAN]\n")
 
+        val startedAt = System.currentTimeMillis()
         for (i in 0 until steps.length()) {
+            if (!AgentBudget.allow(startedAt, i) || !lifecycle.isWithinBudget(runId, i)) return stop("STOPPED", "Dừng: vượt ngân sách/thời gian tác vụ.")
+            lifecycle.transition(runId, AgentLifecycle.State.RUNNING, i)
             val step = steps.optJSONObject(i)
                 ?: return stop("INVALID_PLAN", "Bước ${i + 1} không hợp lệ.")
             val id = step.optString("id", "s${i + 1}")
@@ -132,8 +141,9 @@ object P2AgentBrain {
             val startedAt = System.nanoTime()
             journal.recordStep(runId, id, tool, "EXECUTE", "STARTED", detail = params.toString().take(1000))
             val result = execute(context, tool, params)
+            val contract = AgentContracts.normalize(tool, result)
             val latencyMs = (System.nanoTime() - startedAt) / 1_000_000
-            val success = !result.startsWith("LỖI:")
+            val success = AgentContracts.isSuccess(contract)
             ok[id] = success
             journal.recordStep(
                 runId, id, tool, "EXECUTE",
@@ -141,6 +151,7 @@ object P2AgentBrain {
                 latencyMs, result.take(1500)
             )
             journal.recordSkillOutcome(tool, success, latencyMs)
+            lifecycle.checkpoint(runId, i + 1, AgentLifecycle.State.VERIFYING)
             Log.i(
                 TAG,
                 "TRACE id=$id tool=$tool risk=${spec.risk} latencyMs=$latencyMs ok=$success"
@@ -215,6 +226,7 @@ object P2AgentBrain {
         }
 
         val summary = out.toString().trim()
+        lifecycle.transition(runId, if (ok.values.all { it }) AgentLifecycle.State.COMPLETED else AgentLifecycle.State.STOPPED, steps.length())
         journal.finishRun(runId, if (ok.values.all { it }) "COMPLETED" else "STOPPED", summary)
         return summary
     }
