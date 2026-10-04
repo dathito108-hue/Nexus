@@ -18,6 +18,19 @@ object LanguageModelCore {
     private const val MAX_MEMORY_CHARS = 3600
     private const val MAX_USER_CHARS = 6000
 
+    fun shouldUseAgent(input: String): Boolean {
+        val n = input.lowercase()
+        val actionPatterns = listOf(
+            "tạo game", "làm game", "develop game", "tạo web", "làm web",
+            "tạo ứng dụng", "tạo app", "dựng 3d", "tạo mô hình 3d",
+            "xuất stl", "chỉnh video", "sửa video", "capcut",
+            "phân tích btc", "phân tích sol", "phân tích eth", "phân tích xau",
+            "bật đèn", "tắt đèn", "bật điều hòa", "tắt điều hòa",
+            "bật quạt", "tắt quạt", "lên lịch", "đặt lịch", "hẹn giờ"
+        )
+        return actionPatterns.any { n.contains(it) }
+    }
+
     suspend fun respond(context: Context, input: String): String {
         val text = input.trim().take(MAX_USER_CHARS)
         if (text.isEmpty()) return "Bạn muốn Nít hỗ trợ điều gì?"
