@@ -60,7 +60,8 @@ object P2AgentBrain {
                 input,
                 json.optJSONArray("tools") ?: JSONArray(),
                 journal,
-                runId
+                runId,
+                lifecycleRunId
             )
             else -> {
                 journal.finishRun(runId, "INVALID_MODE", "mode không hợp lệ.")
@@ -74,12 +75,13 @@ object P2AgentBrain {
         goal: String,
         steps: JSONArray,
         journal: AgentExecutionJournal,
-        runId: String
+        runId: String,
+        lifecycleRunId: String
     ): String {
         val lifecycle = AgentLifecycle(context)
         fun stop(status: String, message: String): String {
             journal.finishRun(runId, status, message)
-            lifecycle.transition(runId, if (status == "COMPLETED") AgentLifecycle.State.COMPLETED else AgentLifecycle.State.FAILED, error = if (status == "FAILED") message else null)
+            lifecycle.transition(lifecycleRunId, if (status == "COMPLETED") AgentLifecycle.State.COMPLETED else AgentLifecycle.State.FAILED, error = if (status == "FAILED") message else null)
             return message
         }
 
@@ -94,8 +96,8 @@ object P2AgentBrain {
 
         val startedAt = System.currentTimeMillis()
         for (i in 0 until steps.length()) {
-            if (!AgentBudget.allow(startedAt, i) || !lifecycle.isWithinBudget(runId, i)) return stop("STOPPED", "Dừng: vượt ngân sách/thời gian tác vụ.")
-            lifecycle.transition(runId, AgentLifecycle.State.RUNNING, i)
+            if (!AgentBudget.allow(startedAt, i) || !lifecycle.isWithinBudget(lifecycleRunId, i)) return stop("STOPPED", "Dừng: vượt ngân sách/thời gian tác vụ.")
+            lifecycle.transition(lifecycleRunId, AgentLifecycle.State.RUNNING, i)
             val step = steps.optJSONObject(i)
                 ?: return stop("INVALID_PLAN", "Bước ${i + 1} không hợp lệ.")
             val id = step.optString("id", "s${i + 1}")
@@ -151,7 +153,7 @@ object P2AgentBrain {
                 latencyMs, result.take(1500)
             )
             journal.recordSkillOutcome(tool, success, latencyMs)
-            lifecycle.checkpoint(runId, i + 1, AgentLifecycle.State.VERIFYING)
+            lifecycle.checkpoint(lifecycleRunId, i + 1, AgentLifecycle.State.VERIFYING)
             Log.i(
                 TAG,
                 "TRACE id=$id tool=$tool risk=${spec.risk} latencyMs=$latencyMs ok=$success"
@@ -226,7 +228,7 @@ object P2AgentBrain {
         }
 
         val summary = out.toString().trim()
-        lifecycle.transition(runId, if (ok.values.all { it }) AgentLifecycle.State.COMPLETED else AgentLifecycle.State.STOPPED, steps.length())
+        lifecycle.transition(lifecycleRunId, if (ok.values.all { it }) AgentLifecycle.State.COMPLETED else AgentLifecycle.State.STOPPED, steps.length())
         journal.finishRun(runId, if (ok.values.all { it }) "COMPLETED" else "STOPPED", summary)
         return summary
     }
