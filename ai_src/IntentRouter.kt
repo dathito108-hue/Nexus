@@ -32,6 +32,11 @@ object IntentRouter {
         val text = input.trim().take(1800)
         if (text.isEmpty()) return Decision(Route.CHAT, 1f)
         if (obviousAgent(text)) return Decision(Route.AGENT, 1f)
+
+        // Fast-path ordinary conversation so normal chat does not pay for
+        // a classifier generation before the actual answer generation.
+        if (obviousChat(text)) return Decision(Route.CHAT, 0.99f)
+        if (!containsActionSignal(text)) return Decision(Route.CHAT, 0.94f)
         if (!LlamaEngine.isModelLoaded()) return Decision(Route.CHAT, 0f)
 
         val prompt = """
@@ -65,6 +70,33 @@ object IntentRouter {
         } catch (_: Exception) {
             Decision(Route.CHAT, 0f)
         }
+    }
+
+    private fun obviousChat(input: String): Boolean {
+        val n = input.lowercase(Locale.ROOT).trim()
+        val prefixes = listOf(
+            "giải thích", "cho tôi biết", "hãy giải thích", "tại sao",
+            "vì sao", "là gì", "nghĩa là gì", "so sánh", "phân tích",
+            "tóm tắt", "dịch ", "viết ", "viết lại", "sửa câu",
+            "đặt câu", "cho ví dụ", "hướng dẫn", "có nghĩa gì",
+            "bạn nghĩ", "bạn thấy", "hãy kể", "kể cho tôi",
+            "nói về", "mô tả", "giúp tôi hiểu"
+        )
+        return prefixes.any(n::startsWith)
+    }
+
+    private fun containsActionSignal(input: String): Boolean {
+        val n = input.lowercase(Locale.ROOT)
+        val signals = listOf(
+            "thực hiện", "hãy làm", "làm giúp", "tạo giúp", "tạo cho tôi",
+            "chạy giúp", "mở giúp", "đóng giúp", "bật giúp", "tắt giúp",
+            "gửi giúp", "đặt giúp", "lên lịch", "hẹn giờ", "điều khiển",
+            "triển khai", "build", "deploy", "develop", "generate",
+            "tạo game", "tạo web", "tạo app", "tạo ứng dụng",
+            "dựng 3d", "xuất stl", "chỉnh video", "capcut",
+            "phân tích btc", "phân tích sol", "phân tích eth", "phân tích xau"
+        )
+        return signals.any(n::contains)
     }
 
     private fun extractJson(text: String): JSONObject? {
