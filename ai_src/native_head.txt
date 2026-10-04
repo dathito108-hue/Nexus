@@ -30,7 +30,6 @@ void ensureBackendInitialized() {
 }
 
 std::string buildQwenPrompt(const std::string & userPrompt) {
-    // Callers may provide an already formatted Qwen chat template.
     if (userPrompt.find("<|im_start|>") != std::string::npos) return userPrompt;
     return "<|im_start|>system\nBạn là Nít, một trợ lý AI chạy cục bộ trên thiết bị Android. "
            "Trả lời chính xác, hữu ích và trung thực; không tuyên bố đã thực hiện một hành động nếu hành động đó chưa thực sự được thực thi.<|im_end|>\n"
@@ -49,12 +48,21 @@ bool tokenize(const llama_vocab * vocab, const std::string & text, std::vector<l
 
 std::string generateLocked(const std::string & prompt, int maxTokens, float temperature) {
     if (!g_model) return "[NIT_ERROR:model_not_loaded]";
+
     const llama_vocab * vocab = llama_model_get_vocab(g_model);
     const std::string formatted = buildQwenPrompt(prompt);
     std::vector<llama_token> promptTokens;
     if (!tokenize(vocab, formatted, promptTokens)) return "[NIT_ERROR:tokenization_failed]";
 
-    constexpr uint32_t kContext = 4096;
+    // Keep mobile inference bounded while allowing the higher-capability 3B profile
+    // to use more conversational context than the compact profile.
+    const uint32_t trainedContext = llama_model_n_ctx_train(g_model);
+    const uint32_t kMinContext = 4096;
+    const uint32_t kMaxMobileContext = 8192;
+    const uint32_t kContext = std::max(
+        kMinContext,
+        std::min(kMaxMobileContext, trainedContext > 0 ? trainedContext : kMinContext)
+    );
     constexpr uint32_t kBatch = 512;
     if (promptTokens.size() >= kContext - 8) return "[NIT_ERROR:prompt_too_long]";
 
@@ -272,7 +280,6 @@ Java_com_hypernexus_nit_engine_LlamaEngine_unloadModel(JNIEnv *, jobject) {
 extern "C" JNIEXPORT jboolean JNICALL
 Java_com_hypernexus_nit_engine_LlamaEngine_mergeLoRAWeights(
         JNIEnv *, jobject, jstring, jstring, jfloat) {
-    // No fake weight mutation. Real adapter training/merge is a separate phase.
     return JNI_FALSE;
 }
 }
