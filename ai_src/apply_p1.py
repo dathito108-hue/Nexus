@@ -57,6 +57,37 @@ old_gate = "LanguageModelCore.shouldUseAgent(rawInput)"
 new_gate = "IntentRouter.decide(rawInput).route == IntentRouter.Route.AGENT"
 s = s.replace(old_gate, new_gate)
 
+# Route generic conversation through the real language-model core; reserve agent tools for explicit AGENT intent.
+generic_old = """        else {
+            // Thử gọi công cụ tự hành thông qua LLM JSON Tool Calling
+            val toolCallResult = HybridSemanticDispatcher.executeLlmToolCalling(context, rawInput)
+            if (toolCallResult != null) {
+                finalReply = toolCallResult
+            } else {
+                val systemPrompt = "Bạn là Nít, trợ lý AI tự hành tối tân trên Samsung Galaxy S21 FE. Hãy phản hồi ngắn gọn, thông minh và súc tích bằng tiếng Việt."
+                val conversationHistory = memoryManager.getRecentSlidingWindowContext()
+                val historyBuilder = StringBuilder()
+                for ((role, content) in conversationHistory) {
+                    historyBuilder.append("<|im_start|>$role\\n$content<|im_end|>\\n")
+                }
+
+                val fullPrompt = "<|im_start|>system\\n$systemPrompt<|im_end|>\\n$\{historyBuilder}<|im_start|>user\\n$rawInput<|im_end|>\\n<|im_start|>assistant\\n"
+                finalReply = LlamaEngine.generateResponse(fullPrompt, maxTokens = 256, temperature = 0.7f)
+            }
+        }"""
+generic_new = """        else {
+            val decision = IntentRouter.decide(rawInput)
+            if (decision.route == IntentRouter.Route.AGENT) {
+                val toolCallResult = HybridSemanticDispatcher.executeLlmToolCalling(context, rawInput)
+                finalReply = toolCallResult ?: "Nít nhận diện đây là tác vụ nhưng chưa có công cụ phù hợp để thực hiện."
+            } else {
+                finalReply = LanguageModelCore.respond(context, rawInput)
+            }
+        }"""
+if generic_old in s:
+    s = s.replace(generic_old, generic_new, 1)
+else:
+    raise SystemExit("generic SystemRouter branch not found")
 p.write_text(s, encoding="utf-8")
 
 d = Path("app/src/main/java/com/hypernexus/nit/router/HybridSemanticDispatcher.kt")
