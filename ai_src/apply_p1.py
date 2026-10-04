@@ -21,6 +21,7 @@ copy("ai_src/AgentContracts.kt", "app/src/main/java/com/hypernexus/nit/router/Ag
 copy("ai_src/AgentScheduler.kt", "app/src/main/java/com/hypernexus/nit/router/AgentScheduler.kt")
 copy("ai_src/AgentBudget.kt", "app/src/main/java/com/hypernexus/nit/router/AgentBudget.kt")
 copy("ai_src/AgentHealth.kt", "app/src/main/java/com/hypernexus/nit/router/AgentHealth.kt")
+copy("ai_src/LanguageModelCore.kt", "app/src/main/java/com/hypernexus/nit/router/LanguageModelCore.kt")
 
 p = Path("app/src/main/java/com/hypernexus/nit/router/SystemRouter.kt")
 s = p.read_text(encoding="utf-8")
@@ -58,14 +59,17 @@ end = s.find(return_marker, start)
 if start < 0 or end < 0:
     raise SystemExit("SystemRouter generic region not found")
 
-new_generic = """        // 7. SYSTEM 2: P2 STRUCTURED ON-DEVICE AGENT BRAIN
+new_generic = """        // 7. PRIMARY LANGUAGE MODEL: natural conversation goes directly to the LLM.
+        // Explicit action requests are delegated to the structured agent layer.
         else {
             if (!ensureRealModelLoaded()) {
-                finalReply = "Lõi AI cục bộ chưa sẵn sàng. Hãy tải mô hình GGUF Qwen 2.5 1.5B trước."
-            } else {
-                val memoryContext = memoryManager.buildMemoryContext(rawInput, maxChars = 5000)
+                finalReply = "Lõi mô hình ngôn ngữ cục bộ chưa sẵn sàng. Hãy tải mô hình GGUF Qwen 2.5 1.5B trước."
+            } else if (com.hypernexus.nit.router.LanguageModelCore.shouldUseAgent(rawInput)) {
+                val memoryContext = memoryManager.buildMemoryContext(rawInput, maxChars = 3600)
                 val agentResult = com.hypernexus.nit.router.P2AgentBrain.run(context, rawInput, memoryContext)
-                finalReply = agentResult ?: "Nít chưa tạo được quyết định có cấu trúc từ mô hình cục bộ."
+                finalReply = agentResult ?: com.hypernexus.nit.router.LanguageModelCore.respond(context, rawInput)
+            } else {
+                finalReply = com.hypernexus.nit.router.LanguageModelCore.respond(context, rawInput)
             }
         }
 
