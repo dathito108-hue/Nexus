@@ -12,12 +12,36 @@ import java.net.URL
 
 object ModelManager {
     private const val TAG = "ModelManager"
-    const val DEFAULT_MODEL_NAME = "Qwen2.5-1.5B-Instruct-Q4_K_M.gguf"
-    private const val MODEL_DOWNLOAD_URL = "https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct-GGUF/resolve/main/qwen2.5-1.5b-instruct-q4_k_m.gguf"
-    fun getModelFile(context: Context): File = File(context.filesDir, DEFAULT_MODEL_NAME)
+    const val COMPACT_MODEL_NAME = "Qwen2.5-1.5B-Instruct-Q4_K_M.gguf"
+    const val QUALITY_MODEL_NAME = "Qwen2.5-3B-Instruct-Q4_K_M.gguf"
+    private const val COMPACT_URL = "https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct-GGUF/resolve/main/qwen2.5-1.5b-instruct-q4_k_m.gguf"
+    private const val QUALITY_URL = "https://huggingface.co/Qwen/Qwen2.5-3B-Instruct-GGUF/resolve/main/qwen2.5-3b-instruct-q4_k_m.gguf"
+    private const val MIN_GGUF_BYTES = 100L * 1024L * 1024L
+    private const val QUALITY_RAM_BYTES = 8L * 1024L * 1024L * 1024L
+    private const val QUALITY_FREE_BYTES = 5L * 1024L * 1024L * 1024L
+
+    val DEFAULT_MODEL_NAME: String get() = recommendedProfile().fileName
+
+    data class ModelProfile(val id: String, val fileName: String, val url: String, val quality: String)
+
+    fun recommendedProfile(context: Context? = null): ModelProfile {
+        if (context != null && canUseQualityModel(context)) {
+            return ModelProfile("qwen25-3b-q4km", QUALITY_MODEL_NAME, QUALITY_URL, "HIGH")
+        }
+        return ModelProfile("qwen25-15b-q4km", COMPACT_MODEL_NAME, COMPACT_URL, "COMPACT")
+    }
+
+    fun canUseQualityModel(context: Context): Boolean {
+        val am = context.getSystemService(Context.ACTIVITY_SERVICE) as? android.app.ActivityManager ?: return false
+        val info = android.app.ActivityManager.MemoryInfo()
+        am.getMemoryInfo(info)
+        val stat = android.os.StatFs(context.filesDir.absolutePath)
+        return info.totalMem >= QUALITY_RAM_BYTES && stat.availableBytes >= QUALITY_FREE_BYTES
+    }
+    fun getModelFile(context: Context): File = File(context.filesDir, recommendedProfile(context).fileName)
     fun isModelReady(context: Context): Boolean {
         val file = getModelFile(context)
-        return file.isFile && file.length() > 100L * 1024L * 1024L && hasGgufMagic(file)
+        return file.isFile && file.length() > MIN_GGUF_BYTES && hasGgufMagic(file)
     }
     private fun hasGgufMagic(file: File): Boolean = try {
         file.inputStream().use { input ->
@@ -27,12 +51,13 @@ object ModelManager {
         }
     } catch (_: Exception) { false }
     suspend fun downloadModel(context: Context, onProgress: (Int) -> Unit): Boolean = withContext(Dispatchers.IO) {
-        val target = getModelFile(context)
+        val profile = recommendedProfile(context)
+        val target = File(context.filesDir, profile.fileName)
         if (isModelReady(context)) { onProgress(100); return@withContext true }
         val partial = File(target.parentFile, target.name + ".part")
         if (partial.exists()) partial.delete()
         try {
-            val connection = (URL(MODEL_DOWNLOAD_URL).openConnection() as HttpURLConnection).apply {
+            val connection = (URL(profile.url).openConnection() as HttpURLConnection).apply {
                 connectTimeout = 20000
                 readTimeout = 60000
                 instanceFollowRedirects = true
@@ -59,15 +84,15 @@ object ModelManager {
                     output.fd.sync()
                 }
             }
-            if (!hasGgufMagic(partial) || partial.length() < 100L * 1024L * 1024L)
+            if (!hasGgufMagic(partial) || partial.length() < MIN_GGUF_BYTES)
                 throw IllegalStateException("Downloaded file is not a valid GGUF model")
             if (target.exists()) target.delete()
             if (!partial.renameTo(target)) throw IllegalStateException("Cannot atomically install model")
             onProgress(100)
-            Log.i(TAG, "GGUF model ready: " + target.length() + " bytes")
+            Log.i(TAG, "GGUF model ready: " + profile.id + ", " + target.length() + " bytes")
             true
         } catch (e: Exception) {
-            Log.e(TAG, "Model download failed", e)
+            Log.e(TAG, "Model download failed for " + profile.id, e)
             partial.delete()
             false
         }
