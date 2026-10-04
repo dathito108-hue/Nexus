@@ -82,8 +82,15 @@ std::string generateLocked(const std::string & prompt, int maxTokens, float temp
     if (!sampler) { llama_free(ctx); return "[NIT_ERROR:sampler_init_failed]"; }
 
     const float temp = std::clamp(temperature, 0.05f, 1.5f);
+    // Mobile-oriented quality sampling: repetition penalty + min-p reduce
+    // loops and low-probability noise while preserving natural variation.
+    const int32_t vocabSize = llama_vocab_n_tokens(vocab);
+    llama_sampler_chain_add(sampler, llama_sampler_init_penalties(
+        vocabSize, 64, 1.08f, 0.0f, 0.0f
+    ));
     llama_sampler_chain_add(sampler, llama_sampler_init_top_k(40));
     llama_sampler_chain_add(sampler, llama_sampler_init_top_p(0.92f, 1));
+    llama_sampler_chain_add(sampler, llama_sampler_init_min_p(0.05f, 1));
     llama_sampler_chain_add(sampler, llama_sampler_init_temp(temp));
     llama_sampler_chain_add(sampler, llama_sampler_init_dist(LLAMA_DEFAULT_SEED));
 
