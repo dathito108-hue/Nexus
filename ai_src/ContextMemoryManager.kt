@@ -166,12 +166,30 @@ class ContextMemoryManager(context: Context) : SQLiteOpenHelper(context, "hyper_
             .map { it.text }
     }
 
-    fun buildMemoryContext(query: String, maxChars: Int = 5000): String {
+    /**
+     * P16.1: adaptive context assembly for mobile inference.
+     * Keeps recent and semantically relevant memory under a caller-defined budget.
+     */
+    fun buildAdaptiveMemoryContext(
+        query: String,
+        recentLimit: Int,
+        semanticLimit: Int,
+        maxChars: Int
+    ): String {
         val seen = LinkedHashSet<String>()
-        for (item in getRecentSlidingWindowContext(6)) seen.add(item.first + ": " + item.second)
-        for (item in retrieveRelevantMemories(query, 8)) seen.add(item)
-        return seen.take(12).joinToString("\n") { "- " + it }.take(maxChars)
+        for (item in getRecentSlidingWindowContext(recentLimit.coerceIn(1, 10))) {
+            seen.add(item.first.uppercase(Locale.ROOT) + ": " + item.second)
+        }
+        for (item in retrieveRelevantMemories(query, semanticLimit.coerceIn(1, 8))) {
+            seen.add(item)
+        }
+        return seen.take(16)
+            .joinToString("\n") { "- " + it }
+            .take(maxChars.coerceIn(800, 7000))
     }
+
+    fun buildMemoryContext(query: String, maxChars: Int = 5000): String =
+        buildAdaptiveMemoryContext(query, 6, 8, maxChars)
 
     fun pruneOldMemories(days: Int = 30) {
         try {
