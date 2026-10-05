@@ -71,7 +71,7 @@ object LanguageModelCore {
             )
         }
 
-        val prompt = buildChatPrompt(text, recent, semantic)
+        val prompt = buildChatPrompt(text, adaptiveMemory)
         val answer = withContext(Dispatchers.Default) {
             if (onDelta == null) {
                 LlamaEngine.generateResponse(
