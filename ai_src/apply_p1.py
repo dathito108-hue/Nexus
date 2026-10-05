@@ -90,6 +90,99 @@ else:
     raise SystemExit("generic SystemRouter branch not found")
 p.write_text(s, encoding="utf-8")
 
+# Wire the real local language model into the visible chat terminal.
+# Streaming is used only for ordinary conversation; agent/tool routing remains
+# behind SystemRouter + IntentRouter and is therefore not bypassed by the UI.
+main_activity = Path("app/src/main/java/com/hypernexus/nit/MainActivity.kt")
+if main_activity.exists():
+    ms = main_activity.read_text(encoding="utf-8")
+    ms = ms.replace(
+        "import com.hypernexus.nit.engine.ModelManager\\n",
+        "import com.hypernexus.nit.engine.ModelManager\\nimport com.hypernexus.nit.router.LanguageModelCore\\n"
+    )
+    ms = ms.replace(
+        "    private lateinit var tvTerminalOutput: TextView\\n",
+        "    private lateinit var tvTerminalOutput: TextView\\n    private lateinit var etChatInput: EditText\\n    private lateinit var btnChatSend: Button\\n"
+    )
+    ms = ms.replace(
+        "        tvTerminalOutput = findViewById(R.id.tv_terminal_output)\\n",
+        "        tvTerminalOutput = findViewById(R.id.tv_terminal_output)\\n        etChatInput = findViewById(R.id.et_chat_input)\\n        btnChatSend = findViewById(R.id.btn_chat_send)\\n"
+    )
+    listener_anchor = "        btnOpenAccessibility.setOnClickListener {"
+    chat_block = """        // 4.5. CHAT LLM ON-DEVICE: stream only ordinary language responses.
+        // Agent/tool requests still go through SystemRouter/IntentRouter.
+        btnChatSend.setOnClickListener {
+            val prompt = etChatInput.text.toString().trim()
+            if (prompt.isEmpty()) return@setOnClickListener
+            etChatInput.text?.clear()
+            btnChatSend.isEnabled = false
+            tvTerminalOutput.text = "🤖 [NÍT LLM]: "
+            lifecycleScope.launch {
+                try {
+                    val reply = LanguageModelCore.respondStreaming(this@MainActivity, prompt) { delta ->
+                        runOnUiThread {
+                            tvTerminalOutput.append(delta)
+                        }
+                    }
+                    tvTerminalOutput.append("\n\n📊 " + LanguageModelCore.lastGenerationStats())
+                } catch (t: Throwable) {
+                    tvTerminalOutput.text = "❌ [NÍT LLM]: " + (t.message ?: "Lỗi suy luận cục bộ")
+                } finally {
+                    btnChatSend.isEnabled = true
+                }
+            }
+        }
+
+        etChatInput.setOnEditorActionListener { _, _, _ ->
+            btnChatSend.performClick()
+            true
+        }
+
+"""
+    if listener_anchor in ms and "btnChatSend.setOnClickListener" not in ms:
+        ms = ms.replace(listener_anchor, chat_block + listener_anchor, 1)
+    main_activity.write_text(ms, encoding="utf-8")
+
+layout = Path("app/src/main/res/layout/activity_main.xml")
+if layout.exists():
+    xs = layout.read_text(encoding="utf-8")
+    anchor = """            <TextView
+                android:id="@+id/tv_terminal_output"
+"""
+    chat_xml = """            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:orientation="horizontal">
+
+                <EditText
+                    android:id="@+id/et_chat_input"
+                    android:layout_width="0dp"
+                    android:layout_height="44dp"
+                    android:layout_weight="1"
+                    android:hint="Nói chuyện trực tiếp với Nít..."
+                    android:imeOptions="actionSend"
+                    android:inputType="text|textCapSentences|textMultiLine"
+                    android:maxLines="3"
+                    android:paddingHorizontal="12dp"
+                    android:textColor="#E2E8F0"
+                    android:textColorHint="#64748B"
+                    android:textSize="12sp" />
+
+                <Button
+                    android:id="@+id/btn_chat_send"
+                    android:layout_width="92dp"
+                    android:layout_height="44dp"
+                    android:layout_marginStart="8dp"
+                    android:text="GỬI"
+                    android:textSize="11sp" />
+            </LinearLayout>
+
+"""
+    if "android:id="@+id/et_chat_input" not in xs and anchor in xs:
+        xs = xs.replace(anchor, chat_xml + anchor, 1)
+    layout.write_text(xs, encoding="utf-8")
+
 d = Path("app/src/main/java/com/hypernexus/nit/router/HybridSemanticDispatcher.kt")
 if d.exists():
     ds = d.read_text(encoding="utf-8")
