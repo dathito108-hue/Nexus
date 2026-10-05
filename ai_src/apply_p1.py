@@ -179,7 +179,7 @@ if layout.exists():
             </LinearLayout>
 
 """
-    if "android:id="@+id/et_chat_input" not in xs and anchor in xs:
+    if "android:id=\"@+id/et_chat_input\"" not in xs and anchor in xs:
         xs = xs.replace(anchor, chat_xml + anchor, 1)
     layout.write_text(xs, encoding="utf-8")
 
