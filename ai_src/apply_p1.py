@@ -97,15 +97,15 @@ main_activity = Path("app/src/main/java/com/hypernexus/nit/MainActivity.kt")
 if main_activity.exists():
     ms = main_activity.read_text(encoding="utf-8")
     ms = ms.replace(
-        "import com.hypernexus.nit.engine.ModelManager\\n",
+        "import com.hypernexus.nit.engine.ModelManager\n",
         "import com.hypernexus.nit.engine.ModelManager\\nimport com.hypernexus.nit.router.LanguageModelCore\\n"
     )
     ms = ms.replace(
-        "    private lateinit var tvTerminalOutput: TextView\n",
+        "    private lateinit var tvTerminalOutput: TextView\n    private lateinit var systemRouter: SystemRouter\n",
         "    private lateinit var tvTerminalOutput: TextView\n    private lateinit var etChatInput: EditText\n    private lateinit var btnChatSend: Button\n"
     )
     ms = ms.replace(
-        "        tvTerminalOutput = findViewById(R.id.tv_terminal_output)\n",
+        "        tvTerminalOutput = findViewById(R.id.tv_terminal_output)\n        systemRouter = SystemRouter(this)\n",
         "        tvTerminalOutput = findViewById(R.id.tv_terminal_output)\n        etChatInput = findViewById(R.id.et_chat_input)\n        btnChatSend = findViewById(R.id.btn_chat_send)\n"
     )
     listener_anchor = "        btnOpenAccessibility.setOnClickListener {"
@@ -119,7 +119,7 @@ if main_activity.exists():
             tvTerminalOutput.text = "🤖 [NÍT LLM]: "
             lifecycleScope.launch {
                 try {
-                    val reply = LanguageModelCore.respondStreaming(this@MainActivity, prompt) { delta ->
+                    val reply = systemRouter.routeCommandStreaming(prompt) { delta ->
                         runOnUiThread {
                             tvTerminalOutput.append(delta)
                         }
