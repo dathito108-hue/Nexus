@@ -103,8 +103,9 @@ stream_method = '''
         }
     }
 '''
-if "suspend fun routeCommandStreaming(" not in s:
-    s = s.replace(marker, stream_method + "\n" + marker, 1)
+route_marker = "    fun routeCommand(rawInput: String): String"
+if "suspend fun routeCommandStreaming(" not in s and route_marker in s:
+    s = s.replace(route_marker, stream_method + "\n" + route_marker, 1)
 
 p.write_text(s, encoding="utf-8")
 
