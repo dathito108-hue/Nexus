@@ -101,7 +101,7 @@ if main_activity.exists():
         "import com.hypernexus.nit.engine.ModelManager\nimport com.hypernexus.nit.router.LanguageModelCore\nimport com.hypernexus.nit.router.SystemRouter\n"
     )
     ms = ms.replace(
-        "    private lateinit var tvTerminalOutput: TextView\n    private lateinit var systemRouter: SystemRouter\n",
+        "    private lateinit var tvTerminalOutput: TextView\n    private lateinit var etChatInput: EditText\n    private lateinit var btnChatSend: Button\n    private lateinit var systemRouter: SystemRouter\n",
         "    private lateinit var tvTerminalOutput: TextView\n    private lateinit var etChatInput: EditText\n    private lateinit var btnChatSend: Button\n"
     )
     ms = ms.replace(
