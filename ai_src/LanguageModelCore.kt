@@ -13,8 +13,6 @@ import kotlinx.coroutines.withContext
  * bounded context; the agent layer is reserved for explicit external actions.
  */
 object LanguageModelCore {
-    // Keep the combined prompt comfortably below the mobile context budget.
-    // The native runtime currently targets a 4096-token minimum context.
     private const val MAX_MEMORY_CHARS = 1800
     private const val MAX_RECENT_CHARS = 3000
     private const val MAX_USER_CHARS = 4000
@@ -34,7 +32,22 @@ object LanguageModelCore {
         return actionPatterns.any { n.contains(it) }
     }
 
-    suspend fun respond(context: Context, input: String): String {
+    suspend fun respond(context: Context, input: String): String =
+        respondInternal(context, input, null)
+
+    suspend fun respondStreaming(
+        context: Context,
+        input: String,
+        onDelta: (String) -> Unit
+    ): String = respondInternal(context, input, onDelta)
+
+    fun lastGenerationStats(): String = LlamaEngine.getLastGenerationStats()
+
+    private suspend fun respondInternal(
+        context: Context,
+        input: String,
+        onDelta: ((String) -> Unit)?
+    ): String {
         val text = input.trim().take(MAX_USER_CHARS)
         if (text.isEmpty()) return "Bạn muốn Nít hỗ trợ điều gì?"
 
@@ -52,11 +65,24 @@ object LanguageModelCore {
 
         val prompt = buildChatPrompt(text, recent, semantic)
         val answer = withContext(Dispatchers.Default) {
-            LlamaEngine.generateResponse(
-                prompt,
-                maxTokens = MAX_GENERATION_TOKENS,
-                temperature = 0.72f
-            )
+            if (onDelta == null) {
+                LlamaEngine.generateResponse(
+                    prompt,
+                    maxTokens = MAX_GENERATION_TOKENS,
+                    temperature = 0.72f
+                )
+            } else {
+                LlamaEngine.generateResponseStreaming(
+                    prompt,
+                    maxTokens = MAX_GENERATION_TOKENS,
+                    temperature = 0.72f,
+                    listener = object : LlamaEngine.StreamingListener {
+                        override fun onText(text: String) {
+                            onDelta(text)
+                        }
+                    }
+                )
+            }
         }.trim()
 
         val clean = sanitize(answer)
