@@ -88,6 +88,24 @@ if generic_old in s:
     s = s.replace(generic_old, generic_new, 1)
 else:
     raise SystemExit("generic SystemRouter branch not found")
+stream_method = '''
+    /**
+     * Central streaming gateway: CHAT streams from the real LLM; AGENT stays behind routing.
+     */
+    suspend fun routeCommandStreaming(rawInput: String, onDelta: (String) -> Unit): String = withContext(Dispatchers.Default) {
+        val decision = IntentRouter.decide(rawInput)
+        if (decision.route == IntentRouter.Route.CHAT) {
+            LanguageModelCore.respondStreaming(context, rawInput, onDelta)
+        } else {
+            val reply = routeCommandAsync(rawInput)
+            onDelta(reply)
+            reply
+        }
+    }
+'''
+if "suspend fun routeCommandStreaming(" not in s:
+    s = s.replace(marker, stream_method + "\n" + marker, 1)
+
 p.write_text(s, encoding="utf-8")
 
 # Wire the real local language model into the visible chat terminal.
