@@ -18,9 +18,14 @@ object ModelManager {
     private const val QUALITY_URL = "https://huggingface.co/Qwen/Qwen2.5-3B-Instruct-GGUF/resolve/main/qwen2.5-3b-instruct-q4_k_m.gguf"
     private const val MIN_GGUF_BYTES = 100L * 1024L * 1024L
     private const val QUALITY_RAM_BYTES = 8L * 1024L * 1024L * 1024L
-    private const val QUALITY_FREE_BYTES = 5L * 1024L * 1024L * 1024L
+    private const val QUALITY_AVAIL_RAM_BYTES = 2750L * 1024L * 1024L
+    private const val QUALITY_FREE_BYTES = 3L * 1024L * 1024L * 1024L
 
-    val DEFAULT_MODEL_NAME: String get() = recommendedProfile().fileName
+    /**
+     * Context-free callers must stay deterministic. Runtime selection should use
+     * recommendedProfile(context), which accounts for current memory pressure.
+     */
+    val DEFAULT_MODEL_NAME: String get() = COMPACT_MODEL_NAME
 
     data class ModelProfile(val id: String, val fileName: String, val url: String, val quality: String)
 
@@ -36,7 +41,12 @@ object ModelManager {
         val info = android.app.ActivityManager.MemoryInfo()
         am.getMemoryInfo(info)
         val stat = android.os.StatFs(context.filesDir.absolutePath)
-        return info.totalMem >= QUALITY_RAM_BYTES && stat.availableBytes >= QUALITY_FREE_BYTES
+        // Total RAM alone is not enough: a 3B Q4 model needs headroom for the
+        // llama.cpp context, Android services, and the app UI while generating.
+        !info.lowMemory &&
+            info.totalMem >= QUALITY_RAM_BYTES &&
+            info.availMem >= QUALITY_AVAIL_RAM_BYTES &&
+            stat.availableBytes >= QUALITY_FREE_BYTES
     }
     fun getModelFile(context: Context): File = File(context.filesDir, recommendedProfile(context).fileName)
     fun isModelReady(context: Context): Boolean {
