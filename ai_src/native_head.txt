@@ -7,7 +7,7 @@
 #include <sstream>
 #include <fstream>
 #include <cstring>
-#include <mutex>
+#include <mutex>\n#include <functional>\n#include <chrono>
 #include <android/log.h>
 
 #include "llama.h"
@@ -20,7 +20,7 @@ namespace {
 std::mutex g_runtimeMutex;
 llama_model * g_model = nullptr;
 std::string g_loadedModelPath;
-bool g_backendInitialized = false;
+bool g_backendInitialized = false;\nstd::string g_lastGenerationStats = "status=idle";
 
 void ensureBackendInitialized() {
     if (!g_backendInitialized) {
@@ -46,7 +46,7 @@ bool tokenize(const llama_vocab * vocab, const std::string & text, std::vector<l
     return true;
 }
 
-std::string generateLocked(const std::string & prompt, int maxTokens, float temperature) {
+std::string generateLocked(\n        const std::string & prompt, int maxTokens, float temperature,\n        const std::function<void(const std::string &)> & onChunk = {}) {\n    const auto startedAt = std::chrono::steady_clock::now();
     if (!g_model) return "[NIT_ERROR:model_not_loaded]";
 
     const llama_vocab * vocab = llama_model_get_vocab(g_model);
@@ -111,7 +111,7 @@ std::string generateLocked(const std::string & prompt, int maxTokens, float temp
 
         char piece[256];
         const int32_t n = llama_token_to_piece(vocab, token, piece, sizeof(piece), 0, true);
-        if (n > 0) output.append(piece, static_cast<size_t>(n));
+        if (n > 0) {\n            output.append(piece, static_cast<size_t>(n));\n            pendingChunk.append(piece, static_cast<size_t>(n));\n            ++generatedTokens;\n            if (onChunk && pendingChunk.size() >= 32) {\n                onChunk(pendingChunk);\n                pendingChunk.clear();\n            }\n        }
 
         llama_token nextToken = token;
         batch = llama_batch_get_one(&nextToken, 1);
@@ -235,6 +235,46 @@ Java_com_hypernexus_nit_engine_LlamaEngine_generateResponse(
     std::lock_guard<std::mutex> lock(g_runtimeMutex);
     const std::string result = generateLocked(promptStr, maxTokens, temperature);
     return env->NewStringUTF(result.c_str());
+}
+
+extern "C" JNIEXPORT jstring JNICALL
+Java_com_hypernexus_nit_engine_LlamaEngine_generateResponseStreaming(
+        JNIEnv * env, jobject, jstring prompt, jint maxTokens, jfloat temperature, jobject listener) {
+    const char * input = env->GetStringUTFChars(prompt, nullptr);
+    const std::string promptStr(input ? input : "");
+    env->ReleaseStringUTFChars(prompt, input);
+
+    jclass listenerClass = listener ? env->GetObjectClass(listener) : nullptr;
+    jmethodID onText = listenerClass
+        ? env->GetMethodID(listenerClass, "onText", "(Ljava/lang/String;)V")
+        : nullptr;
+
+    std::lock_guard<std::mutex> lock(g_runtimeMutex);
+    const std::string result = generateLocked(
+        promptStr,
+        maxTokens,
+        temperature,
+        [&](const std::string & chunk) {
+            if (!listener || !onText || chunk.empty()) return;
+            jstring value = env->NewStringUTF(chunk.c_str());
+            if (!value) return;
+            env->CallVoidMethod(listener, onText, value);
+            env->DeleteLocalRef(value);
+            if (env->ExceptionCheck()) {
+                LOGE("Streaming listener threw; callback exception cleared");
+                env->ExceptionClear();
+            }
+        }
+    );
+
+    if (listenerClass) env->DeleteLocalRef(listenerClass);
+    return env->NewStringUTF(result.c_str());
+}
+
+extern "C" JNIEXPORT jstring JNICALL
+Java_com_hypernexus_nit_engine_LlamaEngine_getLastGenerationStats(JNIEnv * env, jobject) {
+    std::lock_guard<std::mutex> lock(g_runtimeMutex);
+    return env->NewStringUTF(g_lastGenerationStats.c_str());
 }
 
 extern "C" JNIEXPORT jfloatArray JNICALL
