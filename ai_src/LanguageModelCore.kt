@@ -13,10 +13,13 @@ import kotlinx.coroutines.withContext
  * bounded context; the agent layer is reserved for explicit external actions.
  */
 object LanguageModelCore {
-    private const val MAX_MEMORY_CHARS = 3600
-    private const val MAX_RECENT_CHARS = 5200
-    private const val MAX_USER_CHARS = 6000
-    private const val MAX_GENERATION_TOKENS = 768
+    // Keep the combined prompt comfortably below the mobile context budget.
+    // The native runtime currently targets a 4096-token minimum context.
+    private const val MAX_MEMORY_CHARS = 1800
+    private const val MAX_RECENT_CHARS = 3000
+    private const val MAX_USER_CHARS = 4000
+    private const val MAX_GENERATION_TOKENS = 640
+    private const val MAX_TURN_CHARS = 750
 
     fun shouldUseAgent(input: String): Boolean {
         val n = input.lowercase()
@@ -41,7 +44,7 @@ object LanguageModelCore {
 
         val memoryManager = ContextMemoryManager(context)
         val recent = withContext(Dispatchers.IO) {
-            memoryManager.getRecentSlidingWindowContext(8)
+            memoryManager.getRecentSlidingWindowContext(4)
         }
         val semantic = withContext(Dispatchers.IO) {
             memoryManager.retrieveRelevantMemories(text, 6)
@@ -74,13 +77,13 @@ object LanguageModelCore {
     ): String {
         val recentBlock = recentTurns
             .joinToString("\n") { (role, content) ->
-                "${role.uppercase()}: ${content.take(1400)}"
+                "${role.uppercase()}: ${content.take(MAX_TURN_CHARS)}"
             }
             .take(MAX_RECENT_CHARS)
             .ifBlank { "(không có hội thoại trước)" }
 
         val semanticBlock = semanticMemories
-            .map { it.take(1000) }
+            .map { it.take(700) }
             .joinToString("\n") { "- $it" }
             .take(MAX_MEMORY_CHARS)
             .ifBlank { "(không có)" }
