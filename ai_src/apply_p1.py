@@ -124,7 +124,7 @@ if main_activity.exists():
                             tvTerminalOutput.append(delta)
                         }
                     }
-                    tvTerminalOutput.append("\n\n📊 " + LanguageModelCore.lastGenerationStats())
+                    tvTerminalOutput.append(" 📊 " + LanguageModelCore.lastGenerationStats())
                 } catch (t: Throwable) {
                     tvTerminalOutput.text = "❌ [NÍT LLM]: " + (t.message ?: "Lỗi suy luận cục bộ")
                 } finally {
