@@ -2,9 +2,21 @@ package com.hypernexus.nit.engine
 
 object LlamaEngine {
     init { System.loadLibrary("hypernexus_native") }
+
+    interface StreamingListener {
+        fun onText(text: String)
+    }
+
     external fun getNativeVersion(): String
     external fun initModel(modelPath: String): Boolean
     external fun generateResponse(prompt: String, maxTokens: Int = 512, temperature: Float = 0.7f): String
+    external fun generateResponseStreaming(
+        prompt: String,
+        maxTokens: Int = 512,
+        temperature: Float = 0.7f,
+        listener: StreamingListener
+    ): String
+    external fun getLastGenerationStats(): String
     external fun isModelLoaded(): Boolean
     external fun getModelInfo(): String
     external fun embedText(text: String, maxDims: Int = 384): FloatArray
