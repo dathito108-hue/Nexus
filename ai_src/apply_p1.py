@@ -98,7 +98,7 @@ if main_activity.exists():
     ms = main_activity.read_text(encoding="utf-8")
     ms = ms.replace(
         "import com.hypernexus.nit.engine.ModelManager\n",
-        "import com.hypernexus.nit.engine.ModelManager\\nimport com.hypernexus.nit.router.LanguageModelCore\\n"
+        "import com.hypernexus.nit.engine.ModelManager\nimport com.hypernexus.nit.router.LanguageModelCore\nimport com.hypernexus.nit.router.SystemRouter\n"
     )
     ms = ms.replace(
         "    private lateinit var tvTerminalOutput: TextView\n    private lateinit var systemRouter: SystemRouter\n",
