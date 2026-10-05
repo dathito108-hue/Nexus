@@ -43,7 +43,7 @@ object ModelManager {
         val stat = android.os.StatFs(context.filesDir.absolutePath)
         // Total RAM alone is not enough: a 3B Q4 model needs headroom for the
         // llama.cpp context, Android services, and the app UI while generating.
-        !info.lowMemory &&
+        return !info.lowMemory &&
             info.totalMem >= QUALITY_RAM_BYTES &&
             info.availMem >= QUALITY_AVAIL_RAM_BYTES &&
             stat.availableBytes >= QUALITY_FREE_BYTES
