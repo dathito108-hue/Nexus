@@ -184,7 +184,15 @@ std::string generateLocked(
                     std::chrono::steady_clock::now() - startedAt).count();
             }
             if (trimAssistantStop(output)) {
-                pendingChunk = output;
+                // P16.9: do not replay bytes that were already emitted before
+                // the stop marker arrived. Keep only the still-buffered tail.
+                const size_t streamedBytes = output.size() >= pendingChunk.size()
+                    ? output.size() - pendingChunk.size()
+                    : 0;
+                pendingChunk = streamedBytes <= output.size()
+                    ? output.substr(streamedBytes)
+                    : std::string();
+                trimAssistantStop(pendingChunk);
                 break;
             }
             if (onChunk && pendingChunk.size() >= 32) {
