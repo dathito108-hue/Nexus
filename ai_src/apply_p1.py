@@ -136,6 +136,7 @@ if main_activity.exists():
             etChatInput.text?.clear()
             btnChatSend.isEnabled = false
             tvTerminalOutput.text = "🤖 [NÍT LLM]: "
+            tvGenerationStats.text = "LLM • đang suy luận..."
             lifecycleScope.launch {
                 try {
                     val reply = systemRouter.routeCommandStreaming(prompt) { delta ->
@@ -143,7 +144,7 @@ if main_activity.exists():
                             tvTerminalOutput.append(delta)
                         }
                     }
-                    tvTerminalOutput.append(" 📊 " + LanguageModelCore.lastGenerationStats())
+                    tvGenerationStats.text = "LLM • " + LanguageModelCore.lastGenerationStats()
                 } catch (t: Throwable) {
                     tvTerminalOutput.text = "❌ [NÍT LLM]: " + (t.message ?: "Lỗi suy luận cục bộ")
                 } finally {
@@ -196,6 +197,15 @@ if layout.exists():
                     android:text="GỬI"
                     android:textSize="11sp" />
             </LinearLayout>
+
+            <TextView
+                android:id="@+id/tv_generation_stats"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:text="LLM • chưa có dữ liệu suy luận"
+                android:textColor="#64748B"
+                android:textSize="10sp" />
 
 """
     if "android:id=\"@+id/et_chat_input\"" not in xs and anchor in xs:
