@@ -33,8 +33,10 @@ bool isUtf8Boundary(const std::string & value) {
         --i;
         ++continuation;
     }
-    if (continuation == 0) return true;
     if (i == 0) return false;
+    const unsigned char last = static_cast<unsigned char>(value.back());
+    if ((last & 0x80) == 0) return true;
+    if (continuation == 0) return false;
     const unsigned char lead = static_cast<unsigned char>(value[i - 1]);
     size_t expected = 1;
     if ((lead & 0xE0) == 0xC0) expected = 2;
