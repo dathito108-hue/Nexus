@@ -128,7 +128,10 @@ std::string generateLocked(
     ctxParams.n_batch = kBatch;
     ctxParams.n_ubatch = kBatch;
     ctxParams.n_seq_max = 1;
-    ctxParams.n_threads = 6;
+    // P16.8: keep batch/prompt evaluation parallelism higher than token decode.
+    // On mobile CPUs this improves prompt throughput without forcing a larger
+    // decode thread count, which is more sensitive to thermal contention.
+    ctxParams.n_threads = 4;
     ctxParams.n_threads_batch = 6;
     ctxParams.flash_attn_type = LLAMA_FLASH_ATTN_TYPE_AUTO;
 
