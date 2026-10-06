@@ -82,14 +82,21 @@ std::string generateLocked(
     std::vector<llama_token> promptTokens;
     if (!tokenize(vocab, formatted, promptTokens)) return "[NIT_ERROR:tokenization_failed]";
 
-    // Keep mobile inference bounded while allowing the higher-capability 3B profile
-    // to use more conversational context than the compact profile.
+    // P16.3: adapt the runtime context to the actual GGUF footprint.
+    // Compact models stay at 4K to reduce KV-cache RAM/latency; larger mobile
+    // profiles may use up to 8K when their trained context supports it.
     const uint32_t trainedContext = llama_model_n_ctx_train(g_model);
+    const uint64_t modelBytes = static_cast<uint64_t>(llama_model_size(g_model));
     const uint32_t kMinContext = 4096;
     const uint32_t kMaxMobileContext = 8192;
+    const uint64_t kQualityModelThresholdBytes = 1600ULL * 1024ULL * 1024ULL;
+    const uint32_t profileContext = modelBytes >= kQualityModelThresholdBytes ? 8192 : 4096;
     const uint32_t kContext = std::max(
         kMinContext,
-        std::min(kMaxMobileContext, trainedContext > 0 ? trainedContext : kMinContext)
+        std::min(
+            kMaxMobileContext,
+            std::min(profileContext, trainedContext > 0 ? trainedContext : kMinContext)
+        )
     );
     constexpr uint32_t kBatch = 512;
     if (promptTokens.size() >= kContext - 8) return "[NIT_ERROR:prompt_too_long]";
@@ -175,7 +182,9 @@ std::string generateLocked(
         + ";ttft_ms=" + std::to_string(ttftMs < 0 ? elapsedMs : ttftMs)
         + ";elapsed_ms=" + std::to_string(elapsedMs)
         + ";tokens_per_second=" + std::to_string(tokPerSec)
-        + ";context=" + std::to_string(kContext);
+        + ";context=" + std::to_string(kContext)
+        + ";model_mb=" + std::to_string(modelBytes / (1024ULL * 1024ULL))
+        + ";context_profile=" + std::string(kContext >= 8192 ? "quality_8k" : "compact_4k");
     llama_sampler_free(sampler);
     llama_free(ctx);
     return output.empty() ? "[NIT_ERROR:empty_generation]" : output;
