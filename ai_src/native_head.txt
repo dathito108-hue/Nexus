@@ -41,7 +41,8 @@ bool isUtf8Boundary(const std::string & value) {
     else if ((lead & 0xF0) == 0xE0) expected = 3;
     else if ((lead & 0xF8) == 0xF0) expected = 4;
     else return false;
-    return continuation < expected;
+    // A complete UTF-8 code point has exactly expected-1 continuation bytes.
+    return continuation == expected - 1;
 }
 
 void ensureBackendInitialized() {
@@ -162,7 +163,8 @@ std::string generateLocked(
                 size_t flushSize = pendingChunk.size();
                 while (flushSize > 0 && !isUtf8Boundary(pendingChunk.substr(0, flushSize))) --flushSize;
                 if (flushSize > 0) {
-                    onChunk(pendingChunk.substr(0, flushSize));
+                    const std::string chunk = pendingChunk.substr(0, flushSize);
+                    onChunk(chunk);
                     pendingChunk.erase(0, flushSize);
                 }
             }
