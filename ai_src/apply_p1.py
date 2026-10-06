@@ -121,11 +121,11 @@ if main_activity.exists():
     )
     ms = ms.replace(
         "    private lateinit var tvTerminalOutput: TextView\n",
-        "    private lateinit var tvTerminalOutput: TextView\n    private lateinit var etChatInput: EditText\n    private lateinit var btnChatSend: Button\n    private lateinit var systemRouter: SystemRouter\n"
+        "    private lateinit var tvTerminalOutput: TextView\n    private lateinit var etChatInput: EditText\n    private lateinit var btnChatSend: Button\n    private lateinit var tvGenerationStats: TextView\n    private lateinit var systemRouter: SystemRouter\n"
     )
     ms = ms.replace(
         "        tvTerminalOutput = findViewById(R.id.tv_terminal_output)\n",
-        "        tvTerminalOutput = findViewById(R.id.tv_terminal_output)\n        etChatInput = findViewById(R.id.et_chat_input)\n        btnChatSend = findViewById(R.id.btn_chat_send)\n        systemRouter = SystemRouter(this)\n"
+        "        tvTerminalOutput = findViewById(R.id.tv_terminal_output)\n        etChatInput = findViewById(R.id.et_chat_input)\n        btnChatSend = findViewById(R.id.btn_chat_send)\n        tvGenerationStats = findViewById(R.id.tv_generation_stats)\n        systemRouter = SystemRouter(this)\n"
     )
     listener_anchor = "        btnOpenAccessibility.setOnClickListener {"
     chat_block = """        // 4.5. CHAT LLM ON-DEVICE: stream only ordinary language responses.
