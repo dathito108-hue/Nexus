@@ -75,6 +75,7 @@ std::string generateLocked(
     std::string pendingChunk;
     int generatedTokens = 0;
     long long ttftMs = -1;
+    long long promptEvalMs = -1;
     if (!g_model) return "[NIT_ERROR:model_not_loaded]";
 
     const llama_vocab * vocab = llama_model_get_vocab(g_model);
@@ -130,7 +131,10 @@ std::string generateLocked(
     llama_sampler_chain_add(sampler, llama_sampler_init_dist(LLAMA_DEFAULT_SEED));
 
     llama_batch batch = llama_batch_get_one(promptTokens.data(), static_cast<int32_t>(promptTokens.size()));
+    const auto promptEvalStartedAt = std::chrono::steady_clock::now();
     int ret = llama_decode(ctx, batch);
+    promptEvalMs = std::chrono::duration_cast<std::chrono::milliseconds>(
+        std::chrono::steady_clock::now() - promptEvalStartedAt).count();
     if (ret != 0) {
         llama_sampler_free(sampler);
         llama_free(ctx);
@@ -180,6 +184,8 @@ std::string generateLocked(
     g_lastGenerationStats = "prompt_tokens=" + std::to_string(promptTokens.size())
         + ";generated_tokens=" + std::to_string(generatedTokens)
         + ";ttft_ms=" + std::to_string(ttftMs < 0 ? elapsedMs : ttftMs)
+        + ";prompt_eval_ms=" + std::to_string(promptEvalMs < 0 ? 0 : promptEvalMs)
+        + ";decode_ms=" + std::to_string(std::max(0LL, elapsedMs - std::max(0LL, promptEvalMs)))
         + ";elapsed_ms=" + std::to_string(elapsedMs)
         + ";tokens_per_second=" + std::to_string(tokPerSec)
         + ";context=" + std::to_string(kContext)
