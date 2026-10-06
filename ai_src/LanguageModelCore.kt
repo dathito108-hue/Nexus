@@ -56,9 +56,6 @@ object LanguageModelCore {
         }
 
         val memoryManager = ContextMemoryManager(context)
-
-        // P16.1: adaptive memory pressure. Long turns reserve more model
-        // context for the current request; short turns can use richer history.
         val memoryBudget = if (text.length > 1800) 2200 else 3600
         val recentLimit = if (text.length > 1800) 3 else 5
         val semanticLimit = if (text.length > 1800) 5 else 7
@@ -75,20 +72,14 @@ object LanguageModelCore {
         val prompt = buildChatPrompt(text, conversationContext)
         val answer = withContext(Dispatchers.Default) {
             if (onDelta == null) {
-                LlamaEngine.generateResponse(
-                    prompt,
-                    maxTokens = MAX_GENERATION_TOKENS,
-                    temperature = 0.72f
-                )
+                LlamaEngine.generateResponse(prompt, maxTokens = MAX_GENERATION_TOKENS, temperature = 0.72f)
             } else {
                 LlamaEngine.generateResponseStreaming(
                     prompt,
                     maxTokens = MAX_GENERATION_TOKENS,
                     temperature = 0.72f,
                     listener = object : LlamaEngine.StreamingListener {
-                        override fun onText(text: String) {
-                            onDelta(text)
-                        }
+                        override fun onText(text: String) { onDelta(text) }
                     }
                 )
             }
@@ -106,9 +97,8 @@ object LanguageModelCore {
     }
 
     /**
-     * P17.4: keep strict conversational continuity separate from semantic long-term memory.
-     * Recent turns are authoritative for dialogue continuity; semantic memories are only
-     * supporting evidence and must never override the current turn.
+     * P17.4: strict conversational continuity is separated from semantic long-term memory.
+     * Recent turns are authoritative for dialogue continuity; semantic memories are supporting evidence.
      */
     private fun buildConversationContext(
         memoryManager: ContextMemoryManager,
@@ -123,13 +113,13 @@ object LanguageModelCore {
         val recent = memoryManager.getRecentSlidingWindowContext(
             recentLimit.coerceIn(1, 10)
         ).joinToString("\n") { (role, content) ->
-            "- \${role.uppercase()}: \${content.take(1200)}"
+            "- ${role.uppercase()}: ${content.take(1200)}"
         }.take(recentBudget)
 
         val semantic = memoryManager.retrieveRelevantMemories(
             query,
             semanticLimit.coerceIn(1, 8)
-        ).joinToString("\n") { "- \${it.take(1000)}" }.take(semanticBudget)
+        ).joinToString("\n") { "- ${it.take(1000)}" }.take(semanticBudget)
 
         return buildString {
             append("RECENT_CONVERSATION:\n")
@@ -139,12 +129,8 @@ object LanguageModelCore {
         }.take(maxChars.coerceIn(800, 7000))
     }
 
-    private fun buildChatPrompt(
-        input: String,
-        conversationContext: String
-    ): String {
-        val contextBlock = conversationContext
-            .take(MAX_MEMORY_CHARS)
+    private fun buildChatPrompt(input: String, conversationContext: String): String {
+        val contextBlock = conversationContext.take(MAX_MEMORY_CHARS)
             .ifBlank { "(không có ngữ cảnh lưu trữ liên quan)" }
 
         return """
