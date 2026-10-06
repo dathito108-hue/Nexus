@@ -61,6 +61,24 @@ std::string buildQwenPrompt(const std::string & userPrompt) {
            "<|im_start|>user\n" + userPrompt + "<|im_end|>\n<|im_start|>assistant\n";
 }
 
+bool trimAssistantStop(std::string & value) {
+    static const std::vector<std::string> kStops = {
+        "<|im_end|>",
+        "<|im_start|>user",
+        "<|im_start|>system"
+    };
+    size_t earliest = std::string::npos;
+    for (const auto & stop : kStops) {
+        const size_t pos = value.find(stop);
+        if (pos != std::string::npos && (earliest == std::string::npos || pos < earliest)) {
+            earliest = pos;
+        }
+    }
+    if (earliest == std::string::npos) return false;
+    value.resize(earliest);
+    return true;
+}
+
 bool tokenize(const llama_vocab * vocab, const std::string & text, std::vector<llama_token> & out) {
     const int32_t n = llama_tokenize(vocab, text.c_str(), static_cast<int32_t>(text.size()), nullptr, 0, true, true);
     if (n <= 0) return n == 0;
@@ -143,6 +161,7 @@ std::string generateLocked(
         llama_free(ctx);
         return "[NIT_ERROR:prompt_decode_failed:" + std::to_string(ret) + "]";
     }
+    const auto generationStartedAt = std::chrono::steady_clock::now();
 
     std::string output;
     output.reserve(static_cast<size_t>(maxTokens) * 4);
@@ -160,6 +179,10 @@ std::string generateLocked(
             if (ttftMs < 0) {
                 ttftMs = std::chrono::duration_cast<std::chrono::milliseconds>(
                     std::chrono::steady_clock::now() - startedAt).count();
+            }
+            if (trimAssistantStop(output)) {
+                pendingChunk = output;
+                break;
             }
             if (onChunk && pendingChunk.size() >= 32) {
                 size_t flushSize = pendingChunk.size();
@@ -184,14 +207,18 @@ std::string generateLocked(
     if (onChunk && !pendingChunk.empty()) onChunk(pendingChunk);
     const auto elapsedMs = std::chrono::duration_cast<std::chrono::milliseconds>(
         std::chrono::steady_clock::now() - startedAt).count();
-    const double tokPerSec = elapsedMs > 0 ? (1000.0 * generatedTokens / elapsedMs) : 0.0;
+    const auto decodeMs = std::chrono::duration_cast<std::chrono::milliseconds>(
+        std::chrono::steady_clock::now() - generationStartedAt).count();
+    const double generationTokPerSec = decodeMs > 0 ? (1000.0 * generatedTokens / decodeMs) : 0.0;
+    const double promptTokPerSec = promptEvalMs > 0 ? (1000.0 * promptTokens.size() / promptEvalMs) : 0.0;
     g_lastGenerationStats = "prompt_tokens=" + std::to_string(promptTokens.size())
         + ";generated_tokens=" + std::to_string(generatedTokens)
         + ";ttft_ms=" + std::to_string(ttftMs < 0 ? elapsedMs : ttftMs)
         + ";prompt_eval_ms=" + std::to_string(promptEvalMs < 0 ? 0 : promptEvalMs)
-        + ";decode_ms=" + std::to_string(std::max(0LL, elapsedMs - std::max(0LL, promptEvalMs)))
+        + ";decode_ms=" + std::to_string(std::max(0LL, decodeMs))
         + ";elapsed_ms=" + std::to_string(elapsedMs)
-        + ";tokens_per_second=" + std::to_string(tokPerSec)
+        + ";prompt_tokens_per_second=" + std::to_string(promptTokPerSec)
+        + ";tokens_per_second=" + std::to_string(generationTokPerSec)
         + ";context=" + std::to_string(kContext)
         + ";model_mb=" + std::to_string(modelBytes / (1024ULL * 1024ULL))
         + ";context_profile=" + std::string(kContext >= 8192 ? "quality_8k" : "compact_4k");
