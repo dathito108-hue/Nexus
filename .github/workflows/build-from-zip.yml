@@ -88,12 +88,16 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          echo "=== searchTimelineMemory ==="
-          grep -R -n -C 3 "searchTimelineMemory" app/src/main/java || true
-          echo "=== performClick calls in GameBotManager ==="
-          sed -n '30,70p' app/src/main/java/com/hypernexus/nit/accessibility/GameBotManager.kt || true
-          echo "=== getTimelineManager calls ==="
-          grep -R -n -C 2 "getTimelineManager" app/src/main/java || true
+          echo "=== GameBotManager source lines 35-60 ==="
+          python - <<'PY'
+          from pathlib import Path
+          p = Path("app/src/main/java/com/hypernexus/nit/accessibility/GameBotManager.kt")
+          for n, line in enumerate(p.read_text(encoding="utf-8").splitlines(), 1):
+              if 35 <= n <= 60:
+                  print(f"{n}: {line!r}")
+          PY
+          echo "=== performClick declarations ==="
+          grep -R -n -E "fun performClick" app/src/main/java/com/hypernexus/nit/accessibility/NitAccessibilityService.kt || true
 
       - name: Set up JDK 17
         uses: actions/setup-java@v4
