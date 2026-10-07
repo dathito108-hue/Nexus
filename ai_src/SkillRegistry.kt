@@ -115,7 +115,13 @@ object SkillRegistry {
             when (spec.id) {
                 "quant_market_analyze" ->
                     require(params.getString("asset").uppercase(Locale.ROOT) in setOf("BTC", "SOL", "XAU", "ETH"))
-                "web_research" -> require(params.getString("query").isNotBlank())\n            "control_smart_home" -> {
+                "web_research" -> require(params.getString("query").isNotBlank())
+                "file_read", "file_list", "file_info" -> require(params.getString("path").isNotBlank())
+                "file_write", "file_append" -> {
+                    require(params.getString("path").isNotBlank())
+                    require(params.getString("content").isNotEmpty())
+                }
+                "control_smart_home" -> {
                     require(params.getString("device").uppercase(Locale.ROOT) in setOf("LIGHT", "AC", "FAN"))
                     require(params.getString("action") in setOf("turn_on", "turn_off"))
                 }
