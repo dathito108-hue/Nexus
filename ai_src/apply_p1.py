@@ -16,6 +16,7 @@ for src, dst in [
     ("ai_src/P2AgentBrain.kt", "app/src/main/java/com/hypernexus/nit/router/P2AgentBrain.kt"),
     ("ai_src/AgentExecutionJournal.kt", "app/src/main/java/com/hypernexus/nit/router/AgentExecutionJournal.kt"),
     ("ai_src/SkillRegistry.kt", "app/src/main/java/com/hypernexus/nit/router/SkillRegistry.kt"),
+    ("ai_src/CapabilityRegistry.kt", "app/src/main/java/com/hypernexus/nit/router/CapabilityRegistry.kt"),
     ("ai_src/AgentLifecycle.kt", "app/src/main/java/com/hypernexus/nit/router/AgentLifecycle.kt"),
     ("ai_src/AgentContracts.kt", "app/src/main/java/com/hypernexus/nit/router/AgentContracts.kt"),
     ("ai_src/AgentScheduler.kt", "app/src/main/java/com/hypernexus/nit/router/AgentScheduler.kt"),
