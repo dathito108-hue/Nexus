@@ -219,3 +219,20 @@ if d.exists():
     ds = d.read_text(encoding="utf-8")
     ds = ds.replace('else -> "Đã nhận diện công cụ $toolName."', 'else -> "Lỗi: công cụ không được đăng ký: $toolName"')
     d.write_text(ds, encoding="utf-8")
+
+# CAP3: web research requires the Android INTERNET permission.
+manifest = Path("app/src/main/AndroidManifest.xml")
+if manifest.exists():
+    ms = manifest.read_text(encoding="utf-8")
+    if "android.permission.INTERNET" not in ms:
+        ms = ms.replace(
+            "<manifest ",
+            '<manifest xmlns:android="http://schemas.android.com/apk/res/android" ',
+            1
+        ) if 'xmlns:android=' not in ms else ms
+        ms = ms.replace(
+            "<application",
+            '<uses-permission android:name="android.permission.INTERNET" />\n    <application',
+            1
+        )
+        manifest.write_text(ms, encoding="utf-8")
