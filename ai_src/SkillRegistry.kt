@@ -87,6 +87,11 @@ object SkillRegistry {
             setOf("action", "target"), Risk.EXTERNAL_ACTION, false, "action_result",
             listOf("nhấn", "bấm", "chạm", "mở ứng dụng", "quay lại", "home", "cuộn", "scroll")
         ),
+        "screen_grounding" to SkillSpec(
+            "screen_grounding", "Đọc cây giao diện hiện tại để định vị mục tiêu và trạng thái UI",
+            emptySet(), Risk.READ_ONLY, false, "screen_grounding",
+            listOf("màn hình hiện tại", "giao diện hiện tại", "định vị nút", "grounding", "screen")
+        ),
         "search_screen_memory" to SkillSpec(
             "search_screen_memory", "Tìm kiếm bộ nhớ màn hình cục bộ",
             setOf("query"), Risk.READ_ONLY, true, "search_result"
@@ -136,6 +141,7 @@ object SkillRegistry {
                     require(params.getString("action") in setOf("tap_text", "tap", "back", "home", "scroll_forward", "scroll_backward"))
                     require(params.getString("target").length <= 160)
                 }
+                "screen_grounding" -> Unit
                 "control_smart_home" -> {
                     require(params.getString("device").uppercase(Locale.ROOT) in setOf("LIGHT", "AC", "FAN"))
                     require(params.getString("action") in setOf("turn_on", "turn_off"))
