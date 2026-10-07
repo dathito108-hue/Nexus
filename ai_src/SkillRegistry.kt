@@ -77,6 +77,11 @@ object SkillRegistry {
             setOf("path"), Risk.READ_ONLY, true, "file_info",
             listOf("thông tin file", "thông tin tệp", "dung lượng file")
         ),
+        "vision_analyze" to SkillSpec(
+            "vision_analyze", "Phân tích ảnh cục bộ bằng đặc trưng pixel và cấu trúc hình ảnh",
+            setOf("source"), Risk.READ_ONLY, true, "vision_features",
+            listOf("phân tích ảnh", "xem ảnh", "hiểu ảnh", "vision", "hình ảnh", "ảnh")
+        ),
         "search_screen_memory" to SkillSpec(
             "search_screen_memory", "Tìm kiếm bộ nhớ màn hình cục bộ",
             setOf("query"), Risk.READ_ONLY, true, "search_result"
@@ -121,6 +126,7 @@ object SkillRegistry {
                     require(params.getString("path").isNotBlank())
                     require(params.getString("content").isNotEmpty())
                 }
+                "vision_analyze" -> require(params.getString("source").isNotBlank())
                 "control_smart_home" -> {
                     require(params.getString("device").uppercase(Locale.ROOT) in setOf("LIGHT", "AC", "FAN"))
                     require(params.getString("action") in setOf("turn_on", "turn_off"))

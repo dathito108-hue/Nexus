@@ -360,6 +360,7 @@ object P2AgentBrain {
             "file_append" -> com.hypernexus.nit.file.FileDocumentEngine.write(c, p.getString("path"), p.getString("content"), append = true)
             "file_list" -> com.hypernexus.nit.file.FileDocumentEngine.list(c, p.getString("path"))
             "file_info" -> com.hypernexus.nit.file.FileDocumentEngine.info(c, p.getString("path"))
+            "vision_analyze" -> com.hypernexus.nit.vision.VisionEngine.analyze(c, p.getString("source"))
             "search_screen_memory" -> {
                 val found = com.hypernexus.nit.evolution.ScreenTimelineMemoryManager(c)
                     .searchTimelineMemory(p.getString("query"), 2)
