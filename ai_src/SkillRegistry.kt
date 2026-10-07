@@ -47,7 +47,7 @@ object SkillRegistry {
             setOf("device", "action"), Risk.EXTERNAL_ACTION, false, "action_result",
             listOf("bật", "tắt", "mở", "đóng", "turn on", "turn off")
         ),
-        "search_screen_memory" to SkillSpec(
+        "web_research" to SkillSpec(\n            "web_research", "Tìm kiếm và tổng hợp nguồn web ở chế độ chỉ đọc",\n            setOf("query"), Risk.READ_ONLY, true, "web_evidence",\n            listOf("tìm trên mạng", "tìm web", "tra cứu", "nghiên cứu", "nguồn", "latest", "mới nhất")\n        ),\n        "search_screen_memory" to SkillSpec(
             "search_screen_memory", "Tìm kiếm bộ nhớ màn hình cục bộ",
             setOf("query"), Risk.READ_ONLY, true, "search_result"
         ),
@@ -85,7 +85,7 @@ object SkillRegistry {
             when (spec.id) {
                 "quant_market_analyze" ->
                     require(params.getString("asset").uppercase(Locale.ROOT) in setOf("BTC", "SOL", "XAU", "ETH"))
-                "control_smart_home" -> {
+                "web_research" -> require(params.getString("query").isNotBlank())\n            "control_smart_home" -> {
                     require(params.getString("device").uppercase(Locale.ROOT) in setOf("LIGHT", "AC", "FAN"))
                     require(params.getString("action") in setOf("turn_on", "turn_off"))
                 }
