@@ -222,6 +222,28 @@ object LanguageModelCore {
         """.trimIndent()
     }
 
+    /** P18.1: classify how the current turn relates to recent conversation without another model call. */
+    private fun inferConversationIntent(input: String, conversationContext: String): String {
+        val n = input.lowercase().trim()
+        val previous = Regex("(?im)^- USER:\\s*(.+)$")
+            .findAll(conversationContext)
+            .map { it.groupValues[1].trim() }
+            .lastOrNull()
+            .orEmpty()
+            .lowercase()
+
+        return when {
+            listOf("không phải", "ý tôi là", "sửa lại", "chỉnh lại", "tôi muốn nói", "nhầm")
+                .any(n::contains) -> "CORRECTION"
+            listOf("tiếp tục", "làm tiếp", "tiếp theo", "như trên", "cái đó", "việc này", "nó")
+                .any(n::contains) -> "CONTINUATION"
+            previous.isNotBlank() &&
+                listOf("còn", "vậy", "thế", "còn nếu", "nếu vậy", "sao", "thì sao")
+                    .any(n::contains) -> "FOLLOW_UP"
+            else -> "NEW_TOPIC"
+        }
+    }
+
     /** P18: classify response style locally so the GGUF model spends inference on the answer. */
     private fun inferResponseMode(input: String): String {
         val n = input.lowercase()
