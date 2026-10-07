@@ -20,6 +20,7 @@ object LanguageModelCore {
     private const val MIN_USEFUL_OUTPUT_CHARS = 2
     private const val MAX_TOPIC_CHARS = 420
     private const val MAX_DIALOGUE_STATE_CHARS = 700
+    private const val MAX_CONTEXT_LINK_CHARS = 420
 
     @Volatile
     private var activeTopicHint: String = ""
@@ -76,7 +77,8 @@ object LanguageModelCore {
 
         val topicHint = updateTopicState(text, conversationContext)
         val dialogueState = buildDialogueState(text, conversationContext, topicHint)
-        val prompt = buildChatPrompt(text, conversationContext, topicHint, dialogueState)
+        val contextLink = buildContextLink(text, conversationContext, dialogueState)
+        val prompt = buildChatPrompt(text, conversationContext, topicHint, dialogueState, contextLink)
         val answer = withContext(Dispatchers.Default) {
             if (onDelta == null) {
                 LlamaEngine.generateResponse(prompt, maxTokens = MAX_GENERATION_TOKENS, temperature = 0.72f)
@@ -140,12 +142,14 @@ object LanguageModelCore {
         input: String,
         conversationContext: String,
         topicHint: String,
-        dialogueState: String
+        dialogueState: String,
+        contextLink: String
     ): String {
         val contextBlock = conversationContext.take(MAX_MEMORY_CHARS)
             .ifBlank { "(không có ngữ cảnh lưu trữ liên quan)" }
         val topicBlock = topicHint.ifBlank { "(chưa xác định)" }
         val dialogueBlock = dialogueState.ifBlank { "(chưa xác định)" }
+        val contextLinkBlock = contextLink.ifBlank { "(chưa xác định)" }
 
         return """
             <|im_start|>system
@@ -179,6 +183,9 @@ object LanguageModelCore {
 
             DIALOGUE_STATE:
             $dialogueBlock
+
+            CONTEXT_LINK:
+            $contextLinkBlock
 
             $contextBlock
             <|im_end|>
@@ -274,6 +281,39 @@ object LanguageModelCore {
             "CURRENT_GOAL: ${current.take(260)}"
         ).joinToString("\n").take(MAX_DIALOGUE_STATE_CHARS)
     }
+    /** P17.9: link current intent to recent turns without a second model call. */
+    private fun buildContextLink(
+        input: String,
+        conversationContext: String,
+        dialogueState: String
+    ): String {
+        val current = input.trim()
+        val previousUsers = Regex("(?im)^- USER:\\s*(.+)$")
+            .findAll(conversationContext)
+            .map { it.groupValues[1].trim() }
+            .toList()
+        val previous = previousUsers.lastOrNull().orEmpty()
+        val continuation = listOf(
+            "tiếp tục", "làm tiếp", "tiếp theo", "như trên", "cái đó", "việc này", "nó"
+        ).any(current.lowercase()::contains)
+
+        val relation = when {
+            continuation && previous.isNotBlank() -> "CONTINUATION_OF_RECENT_TURN"
+            previous.isBlank() -> "NEW_TOPIC_NO_PRIOR_TURN"
+            else -> "CURRENT_TURN_WITH_RECENT_CONTEXT"
+        }
+        val anchor = if (continuation) previous.take(220) else current.take(220)
+        val frame = dialogueState.lines()
+            .filter { it.startsWith("SUBJECT:") || it.startsWith("OBJECT:") || it.startsWith("ACTION:") }
+            .joinToString(" | ")
+
+        return listOf(
+            "RELATION: $relation",
+            "ANCHOR: $anchor",
+            "FRAME: $frame"
+        ).joinToString("\n").take(MAX_CONTEXT_LINK_CHARS)
+    }
+
     /** P17.6: cheap topic continuity without another LLM inference. */
     private fun updateTopicState(input: String, conversationContext: String): String {
         val normalized = input.trim().replace(Regex("\\s+"), " ")
