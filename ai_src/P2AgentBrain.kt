@@ -354,7 +354,7 @@ object P2AgentBrain {
                 com.hypernexus.nit.smarthome.SmartHomeLocalBridge
                     .controlDevice(device, p.getString("action"))
             }
-            "search_screen_memory" -> {
+            "web_research" -> com.hypernexus.nit.web.WebResearchEngine.search(p.getString("query"))\n            "search_screen_memory" -> {
                 val found = com.hypernexus.nit.evolution.ScreenTimelineMemoryManager(c)
                     .searchTimelineMemory(p.getString("query"), 2)
                 if (found.isEmpty()) "Không tìm thấy." else "Tìm thấy: ${found[0].textSnippet}"
