@@ -354,7 +354,13 @@ object P2AgentBrain {
                 com.hypernexus.nit.smarthome.SmartHomeLocalBridge
                     .controlDevice(device, p.getString("action"))
             }
-            "web_research" -> com.hypernexus.nit.web.WebResearchEngine.search(p.getString("query"))\n            "search_screen_memory" -> {
+            "web_research" -> com.hypernexus.nit.web.WebResearchEngine.search(p.getString("query"))
+            "file_read" -> com.hypernexus.nit.file.FileDocumentEngine.read(c, p.getString("path"))
+            "file_write" -> com.hypernexus.nit.file.FileDocumentEngine.write(c, p.getString("path"), p.getString("content"), append = false)
+            "file_append" -> com.hypernexus.nit.file.FileDocumentEngine.write(c, p.getString("path"), p.getString("content"), append = true)
+            "file_list" -> com.hypernexus.nit.file.FileDocumentEngine.list(c, p.getString("path"))
+            "file_info" -> com.hypernexus.nit.file.FileDocumentEngine.info(c, p.getString("path"))
+            "search_screen_memory" -> {
                 val found = com.hypernexus.nit.evolution.ScreenTimelineMemoryManager(c)
                     .searchTimelineMemory(p.getString("query"), 2)
                 if (found.isEmpty()) "Không tìm thấy." else "Tìm thấy: ${found[0].textSnippet}"

@@ -11,7 +11,7 @@ object CapabilityRegistry {
         Capability("screen_memory", "Screen Memory", "Tìm lại thông tin đã lưu từ dòng thời gian màn hình.", listOf("search_screen_memory"), State.READY),
         Capability("automation", "Automation", "Lập lịch kế hoạch tự động có kiểm soát.", listOf("schedule_autonomous_plan"), State.READY),
         Capability("web_research", "Web & Research", "Thu thập, tổng hợp và kiểm chứng dữ liệu web.", listOf("web_research"), State.READY),
-        Capability("file_document", "File & Document", "Đọc, tạo và biến đổi tài liệu cục bộ.", emptyList(), State.PARTIAL),
+        Capability("file_document", "File & Document", "Đọc, tạo và biến đổi tài liệu văn bản trong vùng dữ liệu cục bộ của Nít.", listOf("file_read", "file_write", "file_append", "file_list", "file_info"), State.READY),
         Capability("vision", "Vision", "Hiểu ảnh/màn hình và nối kết quả vào kế hoạch hành động.", emptyList(), State.PARTIAL),
         Capability("computer_control", "Computer Interaction", "Tương tác giao diện thông qua lớp accessibility.", emptyList(), State.PARTIAL),
         Capability("creative_3d", "Creative 3D", "Sinh và xuất tài sản 3D trên thiết bị.", listOf("generate_3d_model"), State.READY),

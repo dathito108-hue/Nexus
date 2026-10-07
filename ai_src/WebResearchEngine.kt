@@ -57,6 +57,6 @@ object WebResearchEngine {
         value.replace(Regex("<[^>]+>"), " ").replace(Regex("\\s+"), " ").trim()
 
     private fun decodeHtml(value: String): String =
-        value.replace("&amp;", "&").replace("&quot;", """).replace("&#x27;", "'")
+        value.replace("&amp;", "&").replace("&quot;", "\"").replace("&#x27;", "'")
             .replace("&#39;", "'").replace("&lt;", "<").replace("&gt;", ">")
 }

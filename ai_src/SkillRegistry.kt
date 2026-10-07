@@ -47,7 +47,37 @@ object SkillRegistry {
             setOf("device", "action"), Risk.EXTERNAL_ACTION, false, "action_result",
             listOf("bật", "tắt", "mở", "đóng", "turn on", "turn off")
         ),
-        "web_research" to SkillSpec(\n            "web_research", "Tìm kiếm và tổng hợp nguồn web ở chế độ chỉ đọc",\n            setOf("query"), Risk.READ_ONLY, true, "web_evidence",\n            listOf("tìm trên mạng", "tìm web", "tra cứu", "nghiên cứu", "nguồn", "latest", "mới nhất")\n        ),\n        "search_screen_memory" to SkillSpec(
+        "web_research" to SkillSpec(
+            "web_research", "Tìm kiếm và tổng hợp nguồn web ở chế độ chỉ đọc",
+            setOf("query"), Risk.READ_ONLY, true, "web_evidence",
+            listOf("tìm trên mạng", "tìm web", "tra cứu", "nghiên cứu", "nguồn", "latest", "mới nhất")
+        ),
+        "file_read" to SkillSpec(
+            "file_read", "Đọc tài liệu văn bản cục bộ trong vùng dữ liệu của Nít",
+            setOf("path"), Risk.READ_ONLY, true, "text",
+            listOf("đọc file", "đọc tệp", "đọc tài liệu", "mở file")
+        ),
+        "file_write" to SkillSpec(
+            "file_write", "Tạo hoặc ghi đè tài liệu văn bản cục bộ",
+            setOf("path", "content"), Risk.LOCAL_MUTATION, true, "file",
+            listOf("tạo file", "tạo tệp", "ghi file", "lưu file", "tạo tài liệu")
+        ),
+        "file_append" to SkillSpec(
+            "file_append", "Nối nội dung vào tài liệu văn bản cục bộ",
+            setOf("path", "content"), Risk.LOCAL_MUTATION, true, "file",
+            listOf("thêm vào file", "ghi thêm", "append file")
+        ),
+        "file_list" to SkillSpec(
+            "file_list", "Liệt kê tài liệu và thư mục cục bộ",
+            setOf("path"), Risk.READ_ONLY, true, "file_list",
+            listOf("liệt kê file", "danh sách file", "xem thư mục")
+        ),
+        "file_info" to SkillSpec(
+            "file_info", "Đọc thông tin kích thước và loại tài liệu cục bộ",
+            setOf("path"), Risk.READ_ONLY, true, "file_info",
+            listOf("thông tin file", "thông tin tệp", "dung lượng file")
+        ),
+        "search_screen_memory" to SkillSpec(
             "search_screen_memory", "Tìm kiếm bộ nhớ màn hình cục bộ",
             setOf("query"), Risk.READ_ONLY, true, "search_result"
         ),
