@@ -82,6 +82,11 @@ object SkillRegistry {
             setOf("source"), Risk.READ_ONLY, true, "vision_features",
             listOf("phân tích ảnh", "xem ảnh", "hiểu ảnh", "vision", "hình ảnh", "ảnh")
         ),
+        "computer_control" to SkillSpec(
+            "computer_control", "Tương tác giao diện Android qua AccessibilityService",
+            setOf("action", "target"), Risk.EXTERNAL_ACTION, false, "action_result",
+            listOf("nhấn", "bấm", "chạm", "mở ứng dụng", "quay lại", "home", "cuộn", "scroll")
+        ),
         "search_screen_memory" to SkillSpec(
             "search_screen_memory", "Tìm kiếm bộ nhớ màn hình cục bộ",
             setOf("query"), Risk.READ_ONLY, true, "search_result"
@@ -127,6 +132,10 @@ object SkillRegistry {
                     require(params.getString("content").isNotEmpty())
                 }
                 "vision_analyze" -> require(params.getString("source").isNotBlank())
+                "computer_control" -> {
+                    require(params.getString("action") in setOf("tap_text", "tap", "back", "home", "scroll_forward", "scroll_backward"))
+                    require(params.getString("target").length <= 160)
+                }
                 "control_smart_home" -> {
                     require(params.getString("device").uppercase(Locale.ROOT) in setOf("LIGHT", "AC", "FAN"))
                     require(params.getString("action") in setOf("turn_on", "turn_off"))

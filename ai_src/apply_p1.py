@@ -21,6 +21,9 @@ for src, dst in [
     ("ai_src/WebResearchEngine.kt", "app/src/main/java/com/hypernexus/nit/web/WebResearchEngine.kt"),
     ("ai_src/FileDocumentEngine.kt", "app/src/main/java/com/hypernexus/nit/file/FileDocumentEngine.kt"),
     ("ai_src/VisionEngine.kt", "app/src/main/java/com/hypernexus/nit/vision/VisionEngine.kt"),
+    ("ai_src/NitAccessibilityService.kt", "app/src/main/java/com/hypernexus/nit/accessibility/NitAccessibilityService.kt"),
+    ("ai_src/NitAccessibilityController.kt", "app/src/main/java/com/hypernexus/nit/accessibility/NitAccessibilityController.kt"),
+    ("ai_src/accessibility_service_config.xml", "app/src/main/res/xml/nit_accessibility_service_config.xml"),
     ("ai_src/AgentLifecycle.kt", "app/src/main/java/com/hypernexus/nit/router/AgentLifecycle.kt"),
     ("ai_src/AgentContracts.kt", "app/src/main/java/com/hypernexus/nit/router/AgentContracts.kt"),
     ("ai_src/AgentScheduler.kt", "app/src/main/java/com/hypernexus/nit/router/AgentScheduler.kt"),
@@ -30,6 +33,31 @@ for src, dst in [
     ("ai_src/IntentRouter.kt", "app/src/main/java/com/hypernexus/nit/router/IntentRouter.kt"),
 ]:
     copy(src, dst)
+
+manifest = Path("app/src/main/AndroidManifest.xml")
+if manifest.exists():
+    ms = manifest.read_text(encoding="utf-8")
+    service = """
+        <service
+            android:name=".accessibility.NitAccessibilityService"
+            android:label="Nít Computer Control"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/nit_accessibility_service_config" />
+        </service>
+"""
+    if "NitAccessibilityService" not in ms:
+        pos = ms.rfind("</application>")
+        if pos >= 0:
+            ms = ms[:pos] + service + ms[pos:]
+        else:
+            raise SystemExit("AndroidManifest.xml missing </application>")
+        manifest.write_text(ms, encoding="utf-8")
 
 p = Path("app/src/main/java/com/hypernexus/nit/router/SystemRouter.kt")
 s = p.read_text(encoding="utf-8")

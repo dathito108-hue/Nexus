@@ -361,6 +361,7 @@ object P2AgentBrain {
             "file_list" -> com.hypernexus.nit.file.FileDocumentEngine.list(c, p.getString("path"))
             "file_info" -> com.hypernexus.nit.file.FileDocumentEngine.info(c, p.getString("path"))
             "vision_analyze" -> com.hypernexus.nit.vision.VisionEngine.analyze(c, p.getString("source"))
+            "computer_control" -> com.hypernexus.nit.accessibility.NitAccessibilityController.execute(c, p.getString("action"), p.getString("target"))
             "search_screen_memory" -> {
                 val found = com.hypernexus.nit.evolution.ScreenTimelineMemoryManager(c)
                     .searchTimelineMemory(p.getString("query"), 2)
