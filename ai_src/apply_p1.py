@@ -21,6 +21,7 @@ for src, dst in [
     ("ai_src/WebResearchEngine.kt", "app/src/main/java/com/hypernexus/nit/web/WebResearchEngine.kt"),
     ("ai_src/FileDocumentEngine.kt", "app/src/main/java/com/hypernexus/nit/file/FileDocumentEngine.kt"),
     ("ai_src/VisionEngine.kt", "app/src/main/java/com/hypernexus/nit/vision/VisionEngine.kt"),
+    ("ai_src/ScreenGroundingEngine.kt", "app/src/main/java/com/hypernexus/nit/vision/ScreenGroundingEngine.kt"),
     ("ai_src/NitAccessibilityService.kt", "app/src/main/java/com/hypernexus/nit/accessibility/NitAccessibilityService.kt"),
     ("ai_src/NitAccessibilityController.kt", "app/src/main/java/com/hypernexus/nit/accessibility/NitAccessibilityController.kt"),
     ("ai_src/accessibility_service_config.xml", "app/src/main/res/xml/nit_accessibility_service_config.xml"),
