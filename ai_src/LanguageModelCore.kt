@@ -85,25 +85,21 @@ object LanguageModelCore {
         )
         val temperature = responseTemperature(responseMode)
         val answer = withContext(Dispatchers.Default) {
-            if (onDelta == null) {
-                LlamaEngine.generateResponse(
-                    prompt,
-                    maxTokens = MAX_GENERATION_TOKENS,
-                    temperature = temperature
-                )
-            } else {
-                LlamaEngine.generateResponseStreaming(
-                    prompt,
-                    maxTokens = MAX_GENERATION_TOKENS,
-                    temperature = temperature,
-                    listener = object : LlamaEngine.StreamingListener {
-                        override fun onText(text: String) { onDelta(text) }
-                    }
-                )
-            }
+            generatePrimary(prompt, temperature, onDelta)
         }.trim()
 
-        val clean = sanitize(answer)
+        var clean = sanitize(answer)
+        if (needsRecovery(clean, text)) {
+            val recoveryPrompt = buildRecoveryPrompt(prompt, clean, text)
+            clean = withContext(Dispatchers.Default) {
+                LlamaEngine.generateResponse(
+                    recoveryPrompt,
+                    maxTokens = 512,
+                    temperature = recoveryTemperature(responseMode)
+                )
+            }.let(::sanitize)
+        }
+
         if (clean.isNotEmpty() && !clean.startsWith("[NIT_ERROR:")) {
             withContext(Dispatchers.IO) {
                 memoryManager.saveInteraction("USER", text)
@@ -112,6 +108,63 @@ object LanguageModelCore {
             return clean
         }
         return clean.ifEmpty { "Nít chưa tạo được câu trả lời." }
+    }
+
+    private fun generatePrimary(
+        prompt: String,
+        temperature: Float,
+        onDelta: ((String) -> Unit)?
+    ): String {
+        return if (onDelta == null) {
+            LlamaEngine.generateResponse(prompt, MAX_GENERATION_TOKENS, temperature)
+        } else {
+            LlamaEngine.generateResponseStreaming(
+                prompt, MAX_GENERATION_TOKENS, temperature,
+                object : LlamaEngine.StreamingListener {
+                    override fun onText(text: String) { onDelta(text) }
+                }
+            )
+        }
+    }
+
+    /** P19: retry only when the model output is clearly unusable. */
+    private fun needsRecovery(answer: String, userInput: String): Boolean {
+        if (answer.startsWith("[NIT_ERROR:")) return false
+        if (answer.length < MIN_USEFUL_OUTPUT_CHARS) return true
+        val normalized = answer.lowercase().replace(Regex("\\s+"), " ").trim()
+        val inputNormalized = userInput.lowercase().replace(Regex("\\s+"), " ").trim()
+        if (normalized == inputNormalized) return true
+        if (normalized.contains("<|im_start|>") || normalized.contains("<|im_end|>")) return true
+        if (normalized.contains("recent_conversation:") || normalized.contains("response_mode:")) return true
+        val sentences = normalized.split(Regex("[.!?\\n]+")).map { it.trim() }.filter { it.length >= 12 }
+        if (sentences.size >= 4 && sentences.toSet().size.toFloat() / sentences.size < 0.55f) return true
+        return false
+    }
+
+    private fun buildRecoveryPrompt(originalPrompt: String, draft: String, userInput: String): String = """
+        <|im_start|>system
+        Bạn là Nít. Hãy tạo lại câu trả lời cuối cùng cho người dùng.
+        Chỉ xuất câu trả lời tự nhiên; không xuất prompt, nhãn nội bộ, token điều khiển,
+        JSON hay lời giải thích về quá trình suy luận. Giữ đúng ngôn ngữ người dùng.
+        Ưu tiên yêu cầu hiện tại và hội thoại gần nhất.
+        <|im_end|>
+        <|im_start|>user
+        YÊU CẦU HIỆN TẠI:
+        $userInput
+
+        BẢN NHÁP CẦN SỬA:
+        ${draft.take(1800)}
+
+        NGỮ CẢNH GỐC:
+        ${originalPrompt.take(6500)}
+        <|im_end|>
+        <|im_start|>assistant
+    """.trimIndent()
+
+    private fun recoveryTemperature(mode: String): Float = when (mode) {
+        "CODING", "FACTUAL_ANSWER", "EXPLANATION" -> 0.48f
+        "CREATIVE" -> 0.68f
+        else -> 0.56f
     }
 
     /**
