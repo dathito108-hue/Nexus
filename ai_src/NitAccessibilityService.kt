@@ -45,6 +45,8 @@ class NitAccessibilityService : AccessibilityService() {
 
     fun performClick(text: String): Boolean = clickNodeByText(text)
 
+    /** Compatibility overload for legacy callers using Int/Double coordinates. */
+    fun performClick(x: Number, y: Number): Boolean = performClick(x.toFloat(), y.toFloat())
 
     /** Compatibility facade for legacy automation modules. */
     fun performSwipe(startX: Number, startY: Number, endX: Number, endY: Number): Boolean =
