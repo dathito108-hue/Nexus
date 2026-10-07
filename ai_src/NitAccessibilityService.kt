@@ -71,7 +71,8 @@ class NitAccessibilityService : AccessibilityService() {
      * Returning the service preserves the existing call contract without adding
      * a second automation core.
      */
-    fun getTimelineManager(): NitAccessibilityService = this
+    fun getTimelineManager(): com.hypernexus.nit.evolution.ScreenTimelineMemoryManager =
+           com.hypernexus.nit.evolution.ScreenTimelineMemoryManager(this)
 
     fun performClick(x: Float, y: Float): Boolean {
         if (x !in 0f..4000f || y !in 0f..4000f) return false
