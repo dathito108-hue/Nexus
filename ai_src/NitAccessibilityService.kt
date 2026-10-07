@@ -90,4 +90,20 @@ class NitAccessibilityService : AccessibilityService() {
         val gesture = GestureDescription.Builder().addStroke(stroke).build()
         return dispatchGesture(gesture, null, null)
     }
+
+    /** Legacy game automation overload with completion callback. */
+    fun performClick(x: Float, y: Float, onComplete: () -> Unit): Boolean {
+        if (x !in 0f..4000f || y !in 0f..4000f) return false
+        val path = Path().apply { moveTo(x, y) }
+        val stroke = GestureDescription.StrokeDescription(path, 0, 80)
+        val gesture = GestureDescription.Builder().addStroke(stroke).build()
+        return dispatchGesture(gesture, object : GestureResultCallback() {
+            override fun onCompleted(gestureDescription: GestureDescription?) {
+                onComplete()
+            }
+            override fun onCancelled(gestureDescription: GestureDescription?) {
+                onComplete()
+            }
+        }, null)
+    }
 }
