@@ -13,8 +13,8 @@ import kotlinx.coroutines.withContext
  * bounded context; the agent layer is reserved for explicit external actions.
  */
 object LanguageModelCore {
-    private const val MAX_MEMORY_CHARS = 3200
-    private const val MAX_RECENT_CHARS = 3000
+    private const val MAX_MEMORY_CHARS = 4200
+    private const val MAX_RECENT_CHARS = 3600
     private const val MAX_USER_CHARS = 4000
     private const val MAX_GENERATION_TOKENS = 768
     private const val MIN_USEFUL_OUTPUT_CHARS = 2
@@ -62,9 +62,9 @@ object LanguageModelCore {
         }
 
         val memoryManager = ContextMemoryManager(context)
-        val memoryBudget = if (text.length > 1800) 2200 else 3600
-        val recentLimit = if (text.length > 1800) 3 else 5
-        val semanticLimit = if (text.length > 1800) 5 else 7
+        val memoryBudget = if (text.length > 1800) 3000 else 4200
+        val recentLimit = if (text.length > 1800) 4 else 7
+        val semanticLimit = if (text.length > 1800) 4 else 6
         val conversationContext = withContext(Dispatchers.IO) {
             buildConversationContext(
                 memoryManager = memoryManager,
@@ -125,26 +125,42 @@ object LanguageModelCore {
         semanticLimit: Int,
         maxChars: Int
     ): String {
-        val recentBudget = (maxChars * 0.62f).toInt().coerceAtLeast(700)
-        val semanticBudget = (maxChars - recentBudget).coerceAtLeast(500)
+        // Recent turns are authoritative; semantic memory is supporting context only.
+        val recentBudget = (maxChars * 0.70f).toInt().coerceAtLeast(900)
+        val semanticBudget = (maxChars - recentBudget).coerceAtLeast(600)
 
-        val recent = memoryManager.getRecentSlidingWindowContext(
+        val recentRows = memoryManager.getRecentSlidingWindowContext(
             recentLimit.coerceIn(1, 10)
-        ).joinToString("\n") { (role, content) ->
+        )
+        val recent = recentRows.joinToString("\n") { (role, content) ->
             "- ${role.uppercase()}: ${content.take(1200)}"
         }.take(recentBudget)
 
+        val recentNormalized = recentRows.map { (_, content) ->
+            content.lowercase().replace(Regex("\\s+"), " ").trim()
+        }.filter { it.length >= 24 }
+
         val semantic = memoryManager.retrieveRelevantMemories(
-            query,
-            semanticLimit.coerceIn(1, 8)
-        ).joinToString("\n") { "- ${it.take(1000)}" }.take(semanticBudget)
+            query, semanticLimit.coerceIn(1, 8)
+        ).asSequence()
+            .map { it.trim() }
+            .filter { it.isNotBlank() }
+            .filter { candidate ->
+                val normalized = candidate.lowercase().replace(Regex("\\s+"), " ").trim()
+                recentNormalized.none { recentText ->
+                    normalized == recentText || normalized.contains(recentText) || recentText.contains(normalized)
+                }
+            }
+            .map { "- ${it.take(1000)}" }
+            .joinToString("\n")
+            .take(semanticBudget)
 
         return buildString {
             append("RECENT_CONVERSATION:\n")
             append(if (recent.isBlank()) "(trống)" else recent)
             append("\n\nRELEVANT_MEMORY:\n")
             append(if (semantic.isBlank()) "(trống)" else semantic)
-        }.take(maxChars.coerceIn(800, 7000))
+        }.take(maxChars.coerceIn(1000, 7000))
     }
 
     private fun buildChatPrompt(
