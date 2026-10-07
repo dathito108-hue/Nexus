@@ -79,7 +79,10 @@ object LanguageModelCore {
         val dialogueState = buildDialogueState(text, conversationContext, topicHint)
         val contextLink = buildContextLink(text, conversationContext, dialogueState)
         val responseMode = inferResponseMode(text)
-        val prompt = buildChatPrompt(text, conversationContext, topicHint, dialogueState, contextLink, responseMode)
+        val conversationIntent = inferConversationIntent(text, conversationContext)
+        val prompt = buildChatPrompt(
+            text, conversationContext, topicHint, dialogueState, contextLink, responseMode, conversationIntent
+        )
         val temperature = responseTemperature(responseMode)
         val answer = withContext(Dispatchers.Default) {
             if (onDelta == null) {
@@ -150,7 +153,8 @@ object LanguageModelCore {
         topicHint: String,
         dialogueState: String,
         contextLink: String,
-        responseMode: String
+        responseMode: String,
+        conversationIntent: String
     ): String {
         val contextBlock = conversationContext.take(MAX_MEMORY_CHARS)
             .ifBlank { "(không có ngữ cảnh lưu trữ liên quan)" }
@@ -193,6 +197,12 @@ object LanguageModelCore {
             GENERAL_CHAT: hội thoại tự nhiên, trực tiếp.
             RESPONSE_MODE:
             $responseMode
+            CONVERSATION_INTENT:
+            $conversationIntent
+            If CONVERSATION_INTENT is CONTINUATION, preserve unresolved references from recent turns.
+            If it is CORRECTION, treat the current turn as correcting prior context.
+            If it is FOLLOW_UP, answer the current question using the immediately relevant prior turn.
+            If it is NEW_TOPIC, do not drag unrelated old context into the answer.
 
             ACTIVE_TOPIC_HINT:
             $topicBlock
