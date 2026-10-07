@@ -45,6 +45,34 @@ class NitAccessibilityService : AccessibilityService() {
 
     fun performClick(text: String): Boolean = clickNodeByText(text)
 
+
+    /** Compatibility facade for legacy automation modules. */
+    fun performSwipe(startX: Number, startY: Number, endX: Number, endY: Number): Boolean =
+        performSwipe(startX, startY, endX, endY, 350L)
+
+    fun performSwipe(startX: Number, startY: Number, endX: Number, endY: Number, durationMs: Number): Boolean {
+        val sx = startX.toFloat()
+        val sy = startY.toFloat()
+        val ex = endX.toFloat()
+        val ey = endY.toFloat()
+        val duration = durationMs.toLong().coerceIn(50L, 5000L)
+        if (sx !in 0f..4000f || sy !in 0f..4000f || ex !in 0f..4000f || ey !in 0f..4000f) return false
+        val path = Path().apply {
+            moveTo(sx, sy)
+            lineTo(ex, ey)
+        }
+        val stroke = GestureDescription.StrokeDescription(path, 0, duration)
+        val gesture = GestureDescription.Builder().addStroke(stroke).build()
+        return dispatchGesture(gesture, null, null)
+    }
+
+    /**
+     * Legacy callers use this as an automation/timeline capability provider.
+     * Returning the service preserves the existing call contract without adding
+     * a second automation core.
+     */
+    fun getTimelineManager(): NitAccessibilityService = this
+
     fun performClick(x: Float, y: Float): Boolean {
         if (x !in 0f..4000f || y !in 0f..4000f) return false
         val path = Path().apply { moveTo(x, y) }
