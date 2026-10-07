@@ -76,6 +76,13 @@ class NitAccessibilityService : AccessibilityService() {
     fun getTimelineManager(): com.hypernexus.nit.evolution.ScreenTimelineMemoryManager =
            com.hypernexus.nit.evolution.ScreenTimelineMemoryManager(this)
 
+    /** Compatibility fallback for nullable/boxed coordinate values used by legacy game automation. */
+    fun performClick(x: Any?, y: Any?): Boolean {
+        val nx = (x as? Number)?.toFloat() ?: return false
+        val ny = (y as? Number)?.toFloat() ?: return false
+        return performClick(nx, ny)
+    }
+
     fun performClick(x: Float, y: Float): Boolean {
         if (x !in 0f..4000f || y !in 0f..4000f) return false
         val path = Path().apply { moveTo(x, y) }
