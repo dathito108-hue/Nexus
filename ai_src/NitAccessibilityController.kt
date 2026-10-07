@@ -55,7 +55,11 @@ object NitAccessibilityController {
         val action = if (forward) AccessibilityNodeInfo.ACTION_SCROLL_FORWARD else AccessibilityNodeInfo.ACTION_SCROLL_BACKWARD
         val ok = scrollable.performAction(action)
         scrollable.recycle()
-        return if (ok) "Đã cuộn " + if (forward) "xuống." else "lên." 
+        return if (ok) {
+            "Đã cuộn " + if (forward) "xuống." else "lên."
+        } else {
+            "LỖI: không cuộn được."
+        }
     }
 
     private fun findScrollable(node: AccessibilityNodeInfo): AccessibilityNodeInfo? {
