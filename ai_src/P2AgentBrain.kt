@@ -362,6 +362,11 @@ object P2AgentBrain {
             "file_info" -> com.hypernexus.nit.file.FileDocumentEngine.info(c, p.getString("path"))
             "vision_analyze" -> com.hypernexus.nit.vision.VisionEngine.analyze(c, p.getString("source"))
             "computer_control" -> com.hypernexus.nit.accessibility.NitAccessibilityController.execute(c, p.getString("action"), p.getString("target"))
+            "screen_grounding" -> {
+                val service = com.hypernexus.nit.accessibility.NitAccessibilityService.instance
+                    ?: return "LỖI: Computer Control chưa được người dùng cấp quyền Accessibility."
+                com.hypernexus.nit.vision.ScreenGroundingEngine.inspect(service)
+            }
             "search_screen_memory" -> {
                 val found = com.hypernexus.nit.evolution.ScreenTimelineMemoryManager(c)
                     .searchTimelineMemory(p.getString("query"), 2)
