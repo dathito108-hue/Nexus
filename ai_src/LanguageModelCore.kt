@@ -16,7 +16,7 @@ object LanguageModelCore {
     private const val MAX_MEMORY_CHARS = 3200
     private const val MAX_RECENT_CHARS = 3000
     private const val MAX_USER_CHARS = 4000
-    private const val MAX_GENERATION_TOKENS = 640
+    private const val MAX_GENERATION_TOKENS = 768
     private const val MIN_USEFUL_OUTPUT_CHARS = 2
     private const val MAX_TOPIC_CHARS = 420
     private const val MAX_DIALOGUE_STATE_CHARS = 700
@@ -78,15 +78,21 @@ object LanguageModelCore {
         val topicHint = updateTopicState(text, conversationContext)
         val dialogueState = buildDialogueState(text, conversationContext, topicHint)
         val contextLink = buildContextLink(text, conversationContext, dialogueState)
-        val prompt = buildChatPrompt(text, conversationContext, topicHint, dialogueState, contextLink)
+        val responseMode = inferResponseMode(text)
+        val prompt = buildChatPrompt(text, conversationContext, topicHint, dialogueState, contextLink, responseMode)
+        val temperature = responseTemperature(responseMode)
         val answer = withContext(Dispatchers.Default) {
             if (onDelta == null) {
-                LlamaEngine.generateResponse(prompt, maxTokens = MAX_GENERATION_TOKENS, temperature = 0.72f)
+                LlamaEngine.generateResponse(
+                    prompt,
+                    maxTokens = MAX_GENERATION_TOKENS,
+                    temperature = temperature
+                )
             } else {
                 LlamaEngine.generateResponseStreaming(
                     prompt,
                     maxTokens = MAX_GENERATION_TOKENS,
-                    temperature = 0.72f,
+                    temperature = temperature,
                     listener = object : LlamaEngine.StreamingListener {
                         override fun onText(text: String) { onDelta(text) }
                     }
@@ -143,7 +149,8 @@ object LanguageModelCore {
         conversationContext: String,
         topicHint: String,
         dialogueState: String,
-        contextLink: String
+        contextLink: String,
+        responseMode: String
     ): String {
         val contextBlock = conversationContext.take(MAX_MEMORY_CHARS)
             .ifBlank { "(không có ngữ cảnh lưu trữ liên quan)" }
@@ -177,6 +184,15 @@ object LanguageModelCore {
             hãy nói rõ giả định hoặc hỏi ngắn gọn điều cần thiết.
             Khi câu hỏi đơn giản, trả lời ngắn. Khi cần giải thích, trình bày có cấu trúc rõ ràng.
             Trả lời bằng ngôn ngữ của người dùng, ưu tiên tiếng Việt khi người dùng viết tiếng Việt.
+            RESPONSE_MODE chỉ định cách tổ chức câu trả lời.
+            FACTUAL_ANSWER: ưu tiên chính xác, nói rõ phần chưa chắc chắn.
+            EXPLANATION: giải thích theo nguyên nhân -> cơ chế -> kết luận.
+            CODING: đưa giải pháp triển khai được, không giả vờ đã build/chạy.
+            CREATIVE: sáng tạo nhưng vẫn bám yêu cầu.
+            TASK_CONTINUATION: tiếp tục đúng công việc gần nhất, không lặp lại phần đã xong.
+            GENERAL_CHAT: hội thoại tự nhiên, trực tiếp.
+            RESPONSE_MODE:
+            $responseMode
 
             ACTIVE_TOPIC_HINT:
             $topicBlock
@@ -194,6 +210,26 @@ object LanguageModelCore {
             <|im_end|>
             <|im_start|>assistant
         """.trimIndent()
+    }
+
+    /** P18: classify response style locally so the GGUF model spends inference on the answer. */
+    private fun inferResponseMode(input: String): String {
+        val n = input.lowercase()
+        return when {
+            listOf("code", "kotlin", "java", "c++", "python", "sql", "viết hàm", "sửa code", "debug").any(n::contains) -> "CODING"
+            listOf("tại sao", "vì sao", "giải thích", "cơ chế", "nguyên lý", "là gì").any(n::contains) -> "EXPLANATION"
+            listOf("viết", "sáng tác", "ý tưởng", "kịch bản", "đặt tên", "mô tả", "prompt").any(n::contains) -> "CREATIVE"
+            listOf("tiếp tục", "làm tiếp", "tiếp theo", "như trên", "cái đó", "việc này", "nó").any(n::contains) -> "TASK_CONTINUATION"
+            listOf("?", "bao nhiêu", "khi nào", "ở đâu", "ai", "có phải", "đúng không").any(n::contains) -> "FACTUAL_ANSWER"
+            else -> "GENERAL_CHAT"
+        }
+    }
+
+    private fun responseTemperature(mode: String): Float = when (mode) {
+        "CODING", "FACTUAL_ANSWER", "EXPLANATION" -> 0.62f
+        "CREATIVE" -> 0.82f
+        "TASK_CONTINUATION" -> 0.68f
+        else -> 0.72f
     }
 
     /** P17.8: compact dialogue frame with current-turn priority and slot carry-over. */
