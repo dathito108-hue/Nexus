@@ -35,7 +35,11 @@ object LanguageModelCore {
             "bật đèn", "tắt đèn", "bật điều hòa", "tắt điều hòa",
             "bật quạt", "tắt quạt", "lên lịch", "đặt lịch", "hẹn giờ"
         )
-        return actionPatterns.any { n.contains(it) }
+        // Route any explicitly matched capability through the agent layer so read-only
+        // tools (web/file/vision/market/screen memory/grounding) are not accidentally
+        // answered as plain chat. CapabilityRouter remains deterministic and the agent
+        // still enforces authorization before external actions.
+        return actionPatterns.any { n.contains(it) } || CapabilityRouter.resolve(text).isNotEmpty()
     }
 
     suspend fun respond(context: Context, input: String): String =
