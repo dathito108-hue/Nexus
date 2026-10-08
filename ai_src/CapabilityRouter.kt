@@ -23,7 +23,8 @@ object CapabilityRouter {
         "web_research" to listOf("tìm trên mạng", "tìm web", "tra cứu", "nghiên cứu", "nguồn", "latest", "mới nhất"),
         "file_document" to listOf("file", "tài liệu", "pdf", "docx", "xlsx", "đọc tài liệu", "tạo tài liệu"),
         "vision" to listOf("ảnh", "hình ảnh", "screenshot", "nhìn", "phân tích ảnh"),
-        "computer_control" to listOf("click", "bấm", "nhấn", "mở ứng dụng", "điều khiển máy")
+        "computer_control" to listOf("click", "bấm", "nhấn", "chạm", "mở ứng dụng", "điều khiển máy", "cuộn", "scroll"),
+        "screen_grounding" to listOf("định vị nút", "định vị mục", "màn hình hiện tại", "giao diện hiện tại", "grounding", "screen grounding")
     )
 
     fun resolve(goal: String): List<Match> {
