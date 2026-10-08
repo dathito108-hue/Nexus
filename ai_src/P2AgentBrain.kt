@@ -197,6 +197,7 @@ object P2AgentBrain {
                     }
 
                     repairCount[id] = (repairCount[id] ?: 0) + 1
+                    lifecycle.transition(lifecycleRunId, AgentLifecycle.State.REPAIRING, i)
                     val repairStartedAt = System.nanoTime()
                     journal.recordStep(
                         runId, id, tool, "REPAIR", "STARTED",
