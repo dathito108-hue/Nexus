@@ -204,7 +204,8 @@ object P2AgentBrain {
                     )
                     val repaired = execute(context, tool, repairedParams)
                     val repairLatencyMs = (System.nanoTime() - repairStartedAt) / 1_000_000
-                    val repairSuccess = !repaired.startsWith("LỖI:")
+                    val repairContract = AgentContracts.normalize(tool, repaired)
+                    val repairSuccess = AgentContracts.isSuccess(repairContract)
                     ok[id] = repairSuccess
                     journal.recordStep(
                         runId, id, tool, "REPAIR",
@@ -212,6 +213,7 @@ object P2AgentBrain {
                         repairLatencyMs, repaired.take(1500)
                     )
                     journal.recordSkillOutcome(tool, repairSuccess, repairLatencyMs)
+                    lifecycle.checkpoint(lifecycleRunId, i + 1, AgentLifecycle.State.VERIFYING)
                     Log.i(
                         TAG,
                         "TRACE id=$id tool=$tool risk=${spec.risk} latencyMs=$repairLatencyMs phase=REPAIR ok=$repairSuccess"
@@ -222,6 +224,12 @@ object P2AgentBrain {
                             "FAILED",
                             out.append("• Dừng sau repair lỗi.").toString().trim()
                         )
+                    }
+                    val repairedDecision = evaluateResult(goal, spec, repairedParams, repaired)
+                    journal.recordStep(runId, id, tool, "VERIFY_REPAIR", repairedDecision.verdict, detail = repairedDecision.params?.toString()?.take(1000))
+                    out.append("• ").append(id).append("/VERIFY_REPAIR: ").append(repairedDecision.verdict).append("\\n")
+                    if (repairedDecision.verdict != "OK") {
+                        return stop("STOPPED", out.append("• Dừng: repair chưa đạt xác minh cuối.").toString().trim())
                     }
                 }
             }
