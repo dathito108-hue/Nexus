@@ -39,7 +39,7 @@ object LanguageModelCore {
         // tools (web/file/vision/market/screen memory/grounding) are not accidentally
         // answered as plain chat. CapabilityRouter remains deterministic and the agent
         // still enforces authorization before external actions.
-        return actionPatterns.any { n.contains(it) } || CapabilityRouter.resolve(text).isNotEmpty()
+        return actionPatterns.any { n.contains(it) } || CapabilityRouter.resolve(input).isNotEmpty()
     }
 
     suspend fun respond(context: Context, input: String): String =
