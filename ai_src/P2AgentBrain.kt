@@ -367,7 +367,7 @@ object P2AgentBrain {
                 if (service == null) {
                     "LỖI: Computer Control chưa được người dùng cấp quyền Accessibility."
                 } else {
-                    com.hypernexus.nit.vision.ScreenGroundingEngine.inspect(service)
+                    com.hypernexus.nit.vision.ScreenGroundingEngine.inspect(service, p.getString("target"))
                 }
             }
             "search_screen_memory" -> {
