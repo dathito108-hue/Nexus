@@ -148,7 +148,7 @@ object P2AgentBrain {
             val latencyMs = (System.nanoTime() - startedAt) / 1_000_000
             val success = AgentContracts.isSuccess(contract)
             ok[id] = success
-            if (success) results[id] = contract.rawResult.take(3000)
+            if (success) results[id] = result.take(3000)
             journal.recordStep(
                 runId, id, tool, "EXECUTE",
                 if (success) "SUCCESS" else "FAILED",
@@ -210,7 +210,7 @@ object P2AgentBrain {
                     val repairContract = AgentContracts.normalize(tool, repaired)
                     val repairSuccess = AgentContracts.isSuccess(repairContract)
                     ok[id] = repairSuccess
-                    if (repairSuccess) results[id] = repairContract.rawResult.take(3000)
+                    if (repairSuccess) results[id] = repaired.take(3000)
                     journal.recordStep(
                         runId, id, tool, "REPAIR",
                         if (repairSuccess) "SUCCESS" else "FAILED",
