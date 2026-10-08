@@ -33,18 +33,19 @@ object IntentRouter {
         if (text.isEmpty()) return Decision(Route.CHAT, 1f)
         if (obviousAgent(text)) return Decision(Route.AGENT, 1f)
 
-        // Fast-path ordinary conversation so normal chat does not pay for
-        // a classifier generation before the actual answer generation.
-        if (obviousChat(text)) return Decision(Route.CHAT, 0.99f)
-
-        // Deterministic capability matches are stronger than a second LLM
-        // classifier for explicitly tool-oriented requests. This keeps
-        // web/file/vision/market/screen capabilities reachable while leaving
-        // planning, parameter validation and authorization to the agent layer.
+        // Resolve explicit capabilities before generic chat prefixes. For
+        // example, "phân tích BTC" starts with a normal-chat verb but is
+        // still an actionable market-analysis request. The capability layer
+        // is deterministic; the agent still owns planning, validation and
+        // authorization.
         val capabilityMatch = CapabilityRouter.resolve(text).firstOrNull()
         if (capabilityMatch != null && capabilityMatch.confidence >= 0.65f) {
             return Decision(Route.AGENT, capabilityMatch.confidence)
         }
+
+        // Fast-path ordinary conversation so normal chat does not pay for
+        // a classifier generation before the actual answer generation.
+        if (obviousChat(text)) return Decision(Route.CHAT, 0.99f)
 
         if (!containsActionSignal(text)) return Decision(Route.CHAT, 0.94f)
         if (!LlamaEngine.isModelLoaded()) return Decision(Route.CHAT, 0f)
