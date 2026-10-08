@@ -36,6 +36,16 @@ object IntentRouter {
         // Fast-path ordinary conversation so normal chat does not pay for
         // a classifier generation before the actual answer generation.
         if (obviousChat(text)) return Decision(Route.CHAT, 0.99f)
+
+        // Deterministic capability matches are stronger than a second LLM
+        // classifier for explicitly tool-oriented requests. This keeps
+        // web/file/vision/market/screen capabilities reachable while leaving
+        // planning, parameter validation and authorization to the agent layer.
+        val capabilityMatch = CapabilityRouter.resolve(text).firstOrNull()
+        if (capabilityMatch != null && capabilityMatch.confidence >= 0.65f) {
+            return Decision(Route.AGENT, capabilityMatch.confidence)
+        }
+
         if (!containsActionSignal(text)) return Decision(Route.CHAT, 0.94f)
         if (!LlamaEngine.isModelLoaded()) return Decision(Route.CHAT, 0f)
 
