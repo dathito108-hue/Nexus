@@ -36,12 +36,14 @@ object NitAccessibilityController {
             ?: nodes.firstOrNull { it.isVisibleToUser && it.isEnabled }
         if (node != null) {
             val ok = node.performAction(AccessibilityNodeInfo.ACTION_CLICK)
+            nodes.filter { it !== node }.forEach { it.recycle() }
             node.recycle()
             return if (ok)
                 "ACTION_RESULT\naction=tap_text\nmethod=accessibility_node\ntarget=" + target + "\nsuccess=true\n" +
                     verifyAfterAction(s, target, before)
             else "LỖI: không click được: " + target
         }
+        nodes.forEach { it.recycle() }
 
         val grounded = ScreenGroundingEngine.findBestTarget(s, target)
             ?: return "LỖI: không tìm thấy mục hoặc grounding confidence thấp: " + target
@@ -93,8 +95,9 @@ object NitAccessibilityController {
         if (node.isVisibleToUser) {
             val text = node.text?.toString()?.trim().orEmpty()
             val desc = node.contentDescription?.toString()?.trim().orEmpty()
+            val className = node.className?.toString().orEmpty()
             if (text.isNotEmpty() || desc.isNotEmpty())
-                out += (text + "|" + desc + "|" + node.className.orEmpty()).take(160)
+                out += (text + "|" + desc + "|" + className).take(160)
         }
         for (i in 0 until node.childCount) {
             if (out.size >= 32) break
